@@ -7,6 +7,7 @@ import edu.univ.erp.domain.Section;
 import edu.univ.erp.domain.Student;
 import edu.univ.erp.service.InstructorService;
 import edu.univ.erp.service.StudentService;
+import edu.univ.erp.service.ServiceException;
 
 import javax.swing.*;
 import javax.swing.event.ListSelectionEvent;
@@ -117,6 +118,8 @@ public class GradebookPanel extends JPanel {
             for (Section s : mySections) {
                 sectionSelector.addItem(s.getSectionId() + ": " + s.getCourseCode() + " - " + s.getCourseTitle());
             }
+            // ========= FIX #1 WAS HERE =========
+            // The getMySections() method is read-only and only throws SQLException.
         } catch (SQLException e) {
             showError("Error loading your sections: " + e.getMessage());
         }
@@ -220,7 +223,9 @@ public class GradebookPanel extends JPanel {
 
         } catch (NumberFormatException e) {
             showError("Score must be a valid number.");
-        } catch (SQLException e) {
+            // ========= FIX #2 WAS HERE =========
+            // The submitGrade() method IS a write operation and CAN throw a ServiceException.
+        } catch (SQLException | ServiceException e) {
             showError("Error saving grade: " + e.getMessage());
         }
     }

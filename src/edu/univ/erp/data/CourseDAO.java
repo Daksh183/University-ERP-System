@@ -25,4 +25,9 @@ public interface CourseDAO {
      * @throws SQLException
      */
     List<Section> getSectionsByInstructorId(int instructorId) throws SQLException;
+    // ... inside CourseDAO.java ...
+
+    void createCourse(String code, String title, int credits) throws SQLException;
+
+    void createSection(int courseId, int instructorId, String dayTime, String room, int capacity, String semester, int year) throws SQLException;
 }

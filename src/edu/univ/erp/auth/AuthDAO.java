@@ -16,5 +16,12 @@ public interface AuthDAO {
      * @throws AuthException if login fails (wrong username/password).
      */
     User login(String username, String password) throws SQLException, AuthException;
+    // ... inside AuthDAO.java ...
+
+    /**
+     * Creates a new user in the Auth DB.
+     * @return The auto-generated user_id, or -1 on failure.
+     */
+    int createUser(String username, String role, String passwordHash) throws SQLException;
 }
 

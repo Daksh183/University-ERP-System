@@ -10,16 +10,12 @@ public class AdminDashboard extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        // 1. Create the Menu Bar
+        // --- Create Menu Bar (Same as before) ---
         JMenuBar menuBar = new JMenuBar();
-
-        // 2. Create the "File" menu
         JMenu fileMenu = new JMenu("File");
-        JMenuItem logoutItem = new JMenuItem("Logout");
-        fileMenu.add(logoutItem);
+        fileMenu.add(new JMenuItem("Logout"));
         menuBar.add(fileMenu);
 
-        // 3. Create Admin-specific menus
         JMenu manageMenu = new JMenu("Manage");
         manageMenu.add(new JMenuItem("Manage Users"));
         manageMenu.add(new JMenuItem("Manage Courses & Sections"));
@@ -29,12 +25,18 @@ public class AdminDashboard extends JFrame {
         systemMenu.add(new JMenuItem("Toggle Maintenance Mode"));
         menuBar.add(systemMenu);
 
-        // 4. Add the menu bar to the window
         setJMenuBar(menuBar);
 
-        // Add a welcome label
-        add(new JLabel("Welcome, Admin!", SwingConstants.CENTER));
+        // --- Create the Tabbed Pane ---
+        JTabbedPane tabbedPane = new JTabbedPane();
 
-        // TODO: Add action listeners to menu items (in a later week)
+        // Add your new panels as tabs
+        tabbedPane.addTab("User Management", new UserManagementPanel());
+        tabbedPane.addTab("Course Management", new CourseManagementPanel());
+        tabbedPane.addTab("System Settings", new SettingsPanel());
+
+        // Add the tabbed pane to the window
+        // (Replaces the old "add(new JLabel(...))")
+        add(tabbedPane);
     }
 }

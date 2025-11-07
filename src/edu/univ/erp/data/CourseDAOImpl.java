@@ -100,6 +100,34 @@ public class CourseDAOImpl implements CourseDAO {
         }
         return sections;
     }
+    // ... inside CourseDAOImpl.java ...
 
+    @Override
+    public void createCourse(String code, String title, int credits) throws SQLException {
+        String sql = "INSERT INTO courses (code, title, credits) VALUES (?, ?, ?)";
+        try (Connection conn = DatabaseConnector.getErpConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, code);
+            stmt.setString(2, title);
+            stmt.setInt(3, credits);
+            stmt.executeUpdate();
+        }
+    }
+
+    @Override
+    public void createSection(int courseId, int instructorId, String dayTime, String room, int capacity, String semester, int year) throws SQLException {
+        String sql = "INSERT INTO sections (course_id, instructor_id, day_time, room, capacity, semester, year) VALUES (?, ?, ?, ?, ?, ?, ?)";
+        try (Connection conn = DatabaseConnector.getErpConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, courseId);
+            stmt.setInt(2, instructorId); // Note: Can be 0 if no instructor is assigned yet
+            stmt.setString(3, dayTime);
+            stmt.setString(4, room);
+            stmt.setInt(5, capacity);
+            stmt.setString(6, semester);
+            stmt.setInt(7, year);
+            stmt.executeUpdate();
+        }
+    }
     // You will add other methods here later, like createCourse, etc.
 }

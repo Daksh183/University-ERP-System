@@ -4,6 +4,7 @@ import edu.univ.erp.auth.UserSession;
 import edu.univ.erp.domain.Section;
 import edu.univ.erp.service.CatalogService;
 import edu.univ.erp.service.StudentService;
+import edu.univ.erp.service.ServiceException; // This import is correct
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -130,7 +131,8 @@ public class CourseCatalogPanel extends JPanel {
             JOptionPane.showMessageDialog(this, "Successfully registered for " + selectedSection.getCourseCode() + "!",
                     "Registration Successful", JOptionPane.INFORMATION_MESSAGE);
 
-        } catch (StudentService.ServiceException | SQLException ex) {
+            // ========= FIX #1: CHANGE THIS CATCH BLOCK =========
+        } catch (ServiceException | SQLException ex) {
             // 6. Handle errors (like "Already registered")
             JOptionPane.showMessageDialog(this, "Registration failed: " + ex.getMessage(),
                     "Registration Error", JOptionPane.ERROR_MESSAGE);

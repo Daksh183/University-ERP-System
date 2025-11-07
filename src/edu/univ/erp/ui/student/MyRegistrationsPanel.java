@@ -4,6 +4,7 @@ import edu.univ.erp.auth.UserSession;
 import edu.univ.erp.domain.Enrollment;
 import edu.univ.erp.domain.Section; // We might need this later
 import edu.univ.erp.service.StudentService;
+import edu.univ.erp.service.ServiceException; // ========= FIX #1: ADD THIS IMPORT =========
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -112,7 +113,8 @@ public class MyRegistrationsPanel extends JPanel {
             // Refresh the table
             loadRegistrationData();
 
-        } catch (StudentService.ServiceException | SQLException ex) {
+            // ========= FIX #2: CHANGE THIS CATCH BLOCK =========
+        } catch (ServiceException | SQLException ex) {
             JOptionPane.showMessageDialog(this, "Drop failed: " + ex.getMessage(),
                     "Drop Error", JOptionPane.ERROR_MESSAGE);
         }
