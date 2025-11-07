@@ -3,6 +3,7 @@ package edu.univ.erp.auth;
 import edu.univ.erp.domain.User;
 import java.sql.SQLException;
 
+
 // This is the INTERFACE (the contract)
 public interface AuthDAO {
 
