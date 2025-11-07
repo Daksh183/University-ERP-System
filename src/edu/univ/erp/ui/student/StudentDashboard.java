@@ -10,16 +10,12 @@ public class StudentDashboard extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        // 1. Create the Menu Bar
+        // --- Create Menu Bar (Same as before) ---
         JMenuBar menuBar = new JMenuBar();
-
-        // 2. Create the "File" menu
         JMenu fileMenu = new JMenu("File");
-        JMenuItem logoutItem = new JMenuItem("Logout");
-        fileMenu.add(logoutItem);
+        fileMenu.add(new JMenuItem("Logout"));
         menuBar.add(fileMenu);
 
-        // 3. Create Student-specific menus
         JMenu coursesMenu = new JMenu("Courses");
         coursesMenu.add(new JMenuItem("Browse Course Catalog"));
         coursesMenu.add(new JMenuItem("My Registrations"));
@@ -31,12 +27,18 @@ public class StudentDashboard extends JFrame {
         myMenu.add(new JMenuItem("Download Transcript"));
         menuBar.add(myMenu);
 
-        // 4. Add the menu bar to the window
         setJMenuBar(menuBar);
 
-        // Add a welcome label
-        add(new JLabel("Welcome, Student!", SwingConstants.CENTER));
+        // --- Create the Tabbed Pane ---
+        JTabbedPane tabbedPane = new JTabbedPane();
 
-        // TODO: Add action listeners to menu items (in a later week)
+        // Add your new panels as tabs
+        tabbedPane.addTab("Course Catalog", new CourseCatalogPanel());
+        tabbedPane.addTab("My Registrations", new MyRegistrationsPanel());
+        tabbedPane.addTab("My Timetable", new TimetablePanel());
+
+        // Add the tabbed pane to the window
+        // (Replaces the old "add(new JLabel(...))")
+        add(tabbedPane);
     }
 }
