@@ -16,4 +16,13 @@ public interface CourseDAO {
      * @throws SQLException if a database error occurs.
      */
     List<Section> getAllSections() throws SQLException;
+    // ... inside CourseDAO.java ...
+
+    /**
+     * Retrieves all sections taught by a specific instructor.
+     * @param instructorId The instructor's user ID.
+     * @return A list of Section objects.
+     * @throws SQLException
+     */
+    List<Section> getSectionsByInstructorId(int instructorId) throws SQLException;
 }

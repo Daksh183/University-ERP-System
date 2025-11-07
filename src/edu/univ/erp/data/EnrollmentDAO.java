@@ -2,6 +2,7 @@ package edu.univ.erp.data;
 
 import edu.univ.erp.domain.Enrollment; // <-- Add this import
 import edu.univ.erp.domain.Section;
+import edu.univ.erp.domain.Student;
 
 import java.sql.SQLException;
 import java.util.List; // <-- Add this import
@@ -43,4 +44,13 @@ public interface EnrollmentDAO {
      * @throws SQLException
      */
     List<Section> getEnrolledSectionsByStudentId(int studentId) throws SQLException;
+    // ... inside EnrollmentDAO.java ...
+
+    /**
+     * Gets all Student objects for a specific section.
+     * @param sectionId The section's ID.
+     * @return A list of Student objects.
+     * @throws SQLException
+     */
+    List<Student> getStudentsBySectionId(int sectionId) throws SQLException;
 }

@@ -2,6 +2,7 @@ package edu.univ.erp.data;
 
 import edu.univ.erp.domain.Enrollment; // <-- Add this import
 import edu.univ.erp.domain.Section;
+import edu.univ.erp.domain.Student;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -110,5 +111,36 @@ public class EnrollmentDAOImpl implements EnrollmentDAO {
             }
         }
         return sections;
+    }
+    // ... inside EnrollmentDAOImpl.java ...
+
+// Add this import at the top:
+// import edu.univ.erp.domain.Student;
+
+    @Override
+    public List<Student> getStudentsBySectionId(int sectionId) throws SQLException {
+        List<Student> students = new ArrayList<>();
+        // This query joins enrollments and students tables
+        String sql = "SELECT s.* FROM students s " +
+                "JOIN enrollments e ON s.user_id = e.student_id " +
+                "WHERE e.section_id = ? AND e.status = 'Enrolled'";
+
+        try (Connection conn = DatabaseConnector.getErpConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setInt(1, sectionId);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                while (rs.next()) {
+                    students.add(new Student(
+                            rs.getInt("user_id"),
+                            rs.getString("roll_no"),
+                            rs.getString("program"),
+                            rs.getInt("year")
+                    ));
+                }
+            }
+        }
+        return students;
     }
 }
