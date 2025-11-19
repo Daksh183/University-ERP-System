@@ -1,6 +1,7 @@
 package edu.univ.erp.data;
 
 import java.sql.SQLException;
+import java.time.LocalDate;
 
 public interface SettingsDAO {
 
@@ -17,4 +18,11 @@ public interface SettingsDAO {
      * @throws SQLException
      */
     void setMaintenanceMode(boolean isOon) throws SQLException;
+
+    /**
+     * Retrieves the drop deadline from the settings table.
+     * @return The deadline as a LocalDate.
+     * @throws SQLException
+     */
+    LocalDate getDropDeadline() throws SQLException;
 }

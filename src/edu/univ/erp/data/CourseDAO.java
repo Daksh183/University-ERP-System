@@ -1,33 +1,21 @@
 package edu.univ.erp.data;
 
-import edu.univ.erp.domain.Course;
-import edu.univ.erp.domain.Section; // <-- Add this import
-
+import edu.univ.erp.domain.Section;
 import java.sql.SQLException;
 import java.util.List;
 
 public interface CourseDAO {
 
-    // ... (keep any existing methods) ...
-
-    /**
-     * Retrieves all sections from the database.
-     * @return A list of all Section objects.
-     * @throws SQLException if a database error occurs.
-     */
     List<Section> getAllSections() throws SQLException;
-    // ... inside CourseDAO.java ...
 
-    /**
-     * Retrieves all sections taught by a specific instructor.
-     * @param instructorId The instructor's user ID.
-     * @return A list of Section objects.
-     * @throws SQLException
-     */
     List<Section> getSectionsByInstructorId(int instructorId) throws SQLException;
-    // ... inside CourseDAO.java ...
 
     void createCourse(String code, String title, int credits) throws SQLException;
 
+    void updateCourse(String code, String title, int credits) throws SQLException;
+
     void createSection(int courseId, int instructorId, String dayTime, String room, int capacity, String semester, int year) throws SQLException;
+
+    // --- UPDATED METHOD: Now includes Semester and Year ---
+    void updateSection(int sectionId, int courseId, int instructorId, String dayTime, String room, int capacity, String semester, int year) throws SQLException;
 }

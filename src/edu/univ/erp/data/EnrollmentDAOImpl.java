@@ -1,6 +1,6 @@
 package edu.univ.erp.data;
 
-import edu.univ.erp.domain.Enrollment; // <-- Add this import
+import edu.univ.erp.domain.Enrollment;
 import edu.univ.erp.domain.Section;
 import edu.univ.erp.domain.Student;
 
@@ -8,12 +8,10 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList; // <-- Add this import
-import java.util.List; // <-- Add this import
+import java.util.ArrayList;
+import java.util.List;
 
 public class EnrollmentDAOImpl implements EnrollmentDAO {
-
-    // ... (keep any existing methods) ...
 
     @Override
     public List<Enrollment> getEnrollmentsByStudentId(int studentId) throws SQLException {
@@ -42,7 +40,6 @@ public class EnrollmentDAOImpl implements EnrollmentDAO {
     @Override
     public void addEnrollment(int studentId, int sectionId) throws SQLException {
         // The database has a UNIQUE constraint on (student_id, section_id)
-        // This will automatically throw a SQLException if a duplicate is added.
         String sql = "INSERT INTO enrollments (student_id, section_id, status) VALUES (?, ?, 'Enrolled')";
 
         try (Connection conn = DatabaseConnector.getErpConnection();
@@ -53,8 +50,6 @@ public class EnrollmentDAOImpl implements EnrollmentDAO {
             stmt.executeUpdate();
         }
     }
-
-    // ... inside EnrollmentDAOImpl.java ...
 
     @Override
     public void deleteEnrollment(int enrollmentId) throws SQLException {
@@ -67,14 +62,12 @@ public class EnrollmentDAOImpl implements EnrollmentDAO {
             stmt.executeUpdate();
         }
     }
-    // ... inside EnrollmentDAOImpl.java ...
 
     @Override
     public List<Section> getEnrolledSectionsByStudentId(int studentId) throws SQLException {
         List<Section> sections = new ArrayList<>();
 
-        // This query joins enrollments, sections, courses, instructors, and users_auth
-        String sql = "SELECT s.*, c.code, c.title, ua.username as instructor_name " +
+        String sql = "SELECT s.*, c.code, c.title, c.credits, ua.username as instructor_name " +
                 "FROM enrollments e " +
                 "JOIN sections s ON e.section_id = s.section_id " +
                 "JOIN courses c ON s.course_id = c.course_id " +
@@ -89,7 +82,6 @@ public class EnrollmentDAOImpl implements EnrollmentDAO {
 
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    // 1. Create the Section object
                     Section section = new Section(
                             rs.getInt("section_id"),
                             rs.getInt("course_id"),
@@ -101,9 +93,9 @@ public class EnrollmentDAOImpl implements EnrollmentDAO {
                             rs.getInt("year")
                     );
 
-                    // 2. Set the extra fields from the JOINs
                     section.setCourseCode(rs.getString("code"));
                     section.setCourseTitle(rs.getString("title"));
+                    section.setCredits(rs.getInt("credits"));
                     section.setInstructorName(rs.getString("instructor_name"));
 
                     sections.add(section);
@@ -112,17 +104,15 @@ public class EnrollmentDAOImpl implements EnrollmentDAO {
         }
         return sections;
     }
-    // ... inside EnrollmentDAOImpl.java ...
-
-// Add this import at the top:
-// import edu.univ.erp.domain.Student;
 
     @Override
     public List<Student> getStudentsBySectionId(int sectionId) throws SQLException {
         List<Student> students = new ArrayList<>();
-        // This query joins enrollments and students tables
-        String sql = "SELECT s.* FROM students s " +
+
+        // FIXED: Added "university_auth_db." prefix to join across databases
+        String sql = "SELECT s.*, u.username FROM students s " +
                 "JOIN enrollments e ON s.user_id = e.student_id " +
+                "JOIN university_auth_db.users_auth u ON s.user_id = u.user_id " +
                 "WHERE e.section_id = ? AND e.status = 'Enrolled'";
 
         try (Connection conn = DatabaseConnector.getErpConnection();
@@ -132,12 +122,14 @@ public class EnrollmentDAOImpl implements EnrollmentDAO {
 
             try (ResultSet rs = stmt.executeQuery()) {
                 while (rs.next()) {
-                    students.add(new Student(
+                    Student student = new Student(
                             rs.getInt("user_id"),
                             rs.getString("roll_no"),
                             rs.getString("program"),
                             rs.getInt("year")
-                    ));
+                    );
+                    student.setUsername(rs.getString("username"));
+                    students.add(student);
                 }
             }
         }

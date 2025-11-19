@@ -1,6 +1,6 @@
 package edu.univ.erp.service;
 
-import edu.univ.erp.access.AccessControlService; // <-- ADD THIS IMPORT
+import edu.univ.erp.access.AccessControlService;
 import edu.univ.erp.data.*;
 import edu.univ.erp.domain.Grade;
 import edu.univ.erp.domain.Section;
@@ -15,45 +15,66 @@ public class InstructorService {
     private CourseDAO courseDAO;
     private EnrollmentDAO enrollmentDAO;
     private GradeDAO gradeDAO;
-    private AccessControlService accessControl; // <-- ADD THIS
+    private AccessControlService accessControl;
 
     public InstructorService() {
         this.courseDAO = new CourseDAOImpl();
         this.enrollmentDAO = new EnrollmentDAOImpl();
         this.gradeDAO = new GradeDAOImpl();
-        this.accessControl = new AccessControlService(); // <-- ADD THIS
+        this.accessControl = new AccessControlService();
     }
 
-    /**
-     * Gets all sections assigned to a specific instructor. (READ-ONLY)
-     */
     public List<Section> getMySections(int instructorId) throws SQLException {
         return courseDAO.getSectionsByInstructorId(instructorId);
     }
 
-    /**
-     * Gets all students enrolled in a specific section. (READ-ONLY)
-     */
     public List<Student> getStudentsBySection(int sectionId) throws SQLException {
         return enrollmentDAO.getStudentsBySectionId(sectionId);
     }
 
-    /**
-     * Saves or updates a grade for a student.
-     */
-    public void submitGrade(int enrollmentId, String component, double score) throws SQLException, ServiceException {        // --- MAINTENANCE MODE CHECK ---
+    public void submitGrade(int enrollmentId, String component, double score, double maxMarks, double weightage) throws SQLException, ServiceException {
         if (accessControl.isMaintenanceModeOn()) {
             throw new ServiceException("Maintenance Mode is ON. Submitting grades is temporarily disabled.");
         }
+        gradeDAO.saveOrUpdateGrade(enrollmentId, component, score, maxMarks, weightage);
+    }
 
-        // --- (Original logic) ---
-        gradeDAO.saveOrUpdateGrade(enrollmentId, component, score);
+    public List<Grade> getGradesForEnrollment(int enrollmentId) throws SQLException {
+        return gradeDAO.getGradesForEnrollment(enrollmentId);
     }
 
     /**
-     * Gets all grade components for a specific enrollment. (READ-ONLY)
+     * Calculates the weighted score and publishes "Pass" or "Fail".
+     * @param passingThreshold The percentage required to pass (e.g., 40.0).
      */
-    public List<Grade> getGradesForEnrollment(int enrollmentId) throws SQLException {
-        return gradeDAO.getGradesForEnrollment(enrollmentId);
+    public String computeAndPublishFinalGrade(int enrollmentId, double passingThreshold) throws SQLException, ServiceException {
+        // Check Maintenance Mode
+        if (accessControl.isMaintenanceModeOn()) {
+            throw new ServiceException("Maintenance Mode is ON. Publishing grades is disabled.");
+        }
+
+        List<Grade> grades = gradeDAO.getGradesForEnrollment(enrollmentId);
+        double totalWeightedScore = 0.0;
+
+        for (Grade g : grades) {
+            if (g.getMaxMarks() > 0) {
+                // Formula: (Score / Max) * Weightage
+                double percentage = g.getScore() / g.getMaxMarks();
+                totalWeightedScore += (percentage * g.getWeightage());
+            }
+        }
+
+        // --- NEW LOGIC: Pass vs Fail ---
+        String finalStatus;
+        if (totalWeightedScore >= passingThreshold) {
+            finalStatus = "Pass";
+        } else {
+            finalStatus = "Fail";
+        }
+
+        // Save "Pass" or "Fail" to DB
+        gradeDAO.updateFinalGrade(enrollmentId, finalStatus);
+
+        return finalStatus;
     }
 }

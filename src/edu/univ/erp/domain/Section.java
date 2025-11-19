@@ -14,9 +14,9 @@ public class Section {
     // Extra fields from JOINs (for UI display)
     private String courseCode;
     private String courseTitle;
+    private int credits; // <--- NEW FIELD
     private String instructorName;
 
-    // Main constructor
     public Section(int sectionId, int courseId, int instructorId, String dayTime, String room, int capacity, String semester, int year) {
         this.sectionId = sectionId;
         this.courseId = courseId;
@@ -44,6 +44,9 @@ public class Section {
 
     public String getCourseTitle() { return courseTitle; }
     public void setCourseTitle(String courseTitle) { this.courseTitle = courseTitle; }
+
+    public int getCredits() { return credits; } // <--- NEW GETTER
+    public void setCredits(int credits) { this.credits = credits; } // <--- NEW SETTER
 
     public String getInstructorName() { return instructorName; }
     public void setInstructorName(String instructorName) { this.instructorName = instructorName; }

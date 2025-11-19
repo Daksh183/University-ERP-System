@@ -28,6 +28,8 @@ public class GradeDAOImpl implements GradeDAO {
                             rs.getInt("enrollment_id"),
                             rs.getString("component"),
                             rs.getDouble("score"),
+                            rs.getDouble("max_marks"),
+                            rs.getDouble("weightage"),
                             rs.getString("final_grade")
                     ));
                 }
@@ -37,15 +39,10 @@ public class GradeDAOImpl implements GradeDAO {
     }
 
     @Override
-    public void saveOrUpdateGrade(int enrollmentId, String component, double score) throws SQLException {
-        // This query inserts a new grade. If a grade for that enrollment and
-        // component already exists, it updates the score instead.
-        String sql = "INSERT INTO grades (enrollment_id, component, score) VALUES (?, ?, ?) " +
-                "ON DUPLICATE KEY UPDATE score = VALUES(score)";
-
-        // To make this work, we need a UNIQUE constraint in our database.
-        // Run this SQL in Workbench ONE TIME:
-        // ALTER TABLE grades ADD UNIQUE KEY `idx_enroll_comp` (`enrollment_id`, `component`);
+    public void saveOrUpdateGrade(int enrollmentId, String component, double score, double maxMarks, double weightage) throws SQLException {
+        // Insert or Update all fields including max_marks and weightage
+        String sql = "INSERT INTO grades (enrollment_id, component, score, max_marks, weightage) VALUES (?, ?, ?, ?, ?) " +
+                "ON DUPLICATE KEY UPDATE score = VALUES(score), max_marks = VALUES(max_marks), weightage = VALUES(weightage)";
 
         try (Connection conn = DatabaseConnector.getErpConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
@@ -53,6 +50,23 @@ public class GradeDAOImpl implements GradeDAO {
             stmt.setInt(1, enrollmentId);
             stmt.setString(2, component);
             stmt.setDouble(3, score);
+            stmt.setDouble(4, maxMarks);
+            stmt.setDouble(5, weightage);
+            stmt.executeUpdate();
+        }
+    }
+
+    @Override
+    public void updateFinalGrade(int enrollmentId, String finalGrade) throws SQLException {
+        // Update ALL grade rows for this student with the final grade
+        // (In this schema design, final_grade is stored on every row for convenience)
+        String sql = "UPDATE grades SET final_grade = ? WHERE enrollment_id = ?";
+
+        try (Connection conn = DatabaseConnector.getErpConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, finalGrade);
+            stmt.setInt(2, enrollmentId);
             stmt.executeUpdate();
         }
     }

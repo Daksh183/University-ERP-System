@@ -1,37 +1,63 @@
 package edu.univ.erp.ui.instructor;
 
+import edu.univ.erp.auth.UserSession;
+import edu.univ.erp.ui.auth.LoginWindow;
+
 import javax.swing.*;
 import java.awt.*;
 
 public class InstructorDashboard extends JFrame {
+
+    private JTabbedPane tabbedPane;
+
     public InstructorDashboard() {
         setTitle("Instructor Dashboard");
-        setMinimumSize(new Dimension(800, 600));
+        setMinimumSize(new Dimension(900, 600));
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        // --- Create Menu Bar (Same as before) ---
+        // --- Create Menu Bar ---
         JMenuBar menuBar = new JMenuBar();
+
+        // 1. File Menu
         JMenu fileMenu = new JMenu("File");
-        fileMenu.add(new JMenuItem("Logout"));
+        JMenuItem logoutItem = new JMenuItem("Logout");
+        fileMenu.add(logoutItem);
         menuBar.add(fileMenu);
 
+        // 2. Sections Menu (Navigation)
         JMenu sectionsMenu = new JMenu("Sections");
-        sectionsMenu.add(new JMenuItem("View My Sections"));
-        sectionsMenu.add(new JMenuItem("View Gradebook"));
+        JMenuItem itemMySections = new JMenuItem("View My Sections");
+        JMenuItem itemGradebook = new JMenuItem("View Gradebook");
+        JMenuItem itemClassStats = new JMenuItem("View Class Stats"); // <--- Added this
+
+        sectionsMenu.add(itemMySections);
+        sectionsMenu.add(itemGradebook);
+        sectionsMenu.add(itemClassStats);
         menuBar.add(sectionsMenu);
 
         setJMenuBar(menuBar);
 
         // --- Create the Tabbed Pane ---
-        JTabbedPane tabbedPane = new JTabbedPane();
+        tabbedPane = new JTabbedPane();
 
-        // Add your new panels as tabs
-        tabbedPane.addTab("My Sections", new MySectionsPanel());
-        tabbedPane.addTab("Gradebook", new GradebookPanel());
+        // Add all tabs in order
+        tabbedPane.addTab("My Sections", new MySectionsPanel());    // Index 0
+        tabbedPane.addTab("Gradebook", new GradebookPanel());       // Index 1
+        tabbedPane.addTab("Class Stats", new ClassStatsPanel());    // Index 2
 
-        // Add the tabbed pane to the window
-        // (Replaces the old "add(new JLabel(...))")
         add(tabbedPane);
+
+        // --- 3. Menu Navigation Logic (The "Mapping") ---
+        itemMySections.addActionListener(e -> tabbedPane.setSelectedIndex(0));
+        itemGradebook.addActionListener(e -> tabbedPane.setSelectedIndex(1));
+        itemClassStats.addActionListener(e -> tabbedPane.setSelectedIndex(2));
+
+        // --- 4. Logout Logic ---
+        logoutItem.addActionListener(e -> {
+            UserSession.getInstance().clearSession(); // Clear session
+            this.dispose(); // Close this window
+            new LoginWindow().setVisible(true); // Open login window
+        });
     }
 }

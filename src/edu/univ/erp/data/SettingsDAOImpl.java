@@ -4,10 +4,12 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDate;
 
 public class SettingsDAOImpl implements SettingsDAO {
 
     private static final String MAINTENANCE_KEY = "maintenance_on";
+    private static final String DEADLINE_KEY = "drop_deadline";
 
     @Override
     public boolean isMaintenanceModeOn() throws SQLException {
@@ -42,5 +44,25 @@ public class SettingsDAOImpl implements SettingsDAO {
             stmt.setString(2, MAINTENANCE_KEY);
             stmt.executeUpdate();
         }
+    }
+
+    @Override
+    public LocalDate getDropDeadline() throws SQLException {
+        String sql = "SELECT setting_value FROM settings WHERE setting_key = ?";
+        try (Connection conn = DatabaseConnector.getErpConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, DEADLINE_KEY);
+
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) {
+                    String dateStr = rs.getString("setting_value");
+                    // Parse the YYYY-MM-DD string into a Java LocalDate object
+                    return LocalDate.parse(dateStr);
+                }
+            }
+        }
+        // Fallback if no date is set: Return a date far in the future so dropping works
+        return LocalDate.of(2099, 12, 31);
     }
 }

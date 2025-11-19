@@ -10,12 +10,8 @@ import edu.univ.erp.service.StudentService;
 import edu.univ.erp.service.ServiceException;
 
 import javax.swing.*;
-import javax.swing.event.ListSelectionEvent;
-import javax.swing.event.ListSelectionListener;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.sql.SQLException;
 import java.util.HashMap;
 import java.util.List;
@@ -23,25 +19,26 @@ import java.util.Map;
 
 public class GradebookPanel extends JPanel {
 
-    // Services
     private InstructorService instructorService;
-    private StudentService studentService; // To get enrollment IDs
+    private StudentService studentService;
 
-    // Data storage
     private List<Section> mySections;
     private List<Student> studentsInSection;
-    private List<Enrollment> enrollments;
-    private Map<Integer, Integer> studentToEnrollmentMap; // Maps studentId -> enrollmentId
+    private Map<Integer, Integer> studentToEnrollmentMap;
 
-    // UI Components
     private JComboBox<String> sectionSelector;
     private JTable studentTable;
     private DefaultTableModel studentTableModel;
+
     private JTable gradeTable;
     private DefaultTableModel gradeTableModel;
+
     private JTextField componentField;
     private JTextField scoreField;
+    private JTextField maxMarksField;
+    private JTextField weightageField;
     private JButton saveGradeButton;
+    private JButton publishButton;
     private JPanel gradeEntryPanel;
 
     public GradebookPanel() {
@@ -51,186 +48,197 @@ public class GradebookPanel extends JPanel {
 
         setLayout(new BorderLayout(10, 10));
 
-        // --- 1. Top Panel: Section Selector ---
+        // --- Top: Section Selector ---
         JPanel topPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         topPanel.add(new JLabel("Select Section:"));
         sectionSelector = new JComboBox<>();
         topPanel.add(sectionSelector);
 
-        // --- 2. Center Panel: Split Pane (Students | Grades) ---
-        // Student Table (Left)
-        String[] studentCols = {"Student ID", "Roll No", "Name (from username)"};
+        // --- Center: Split Pane ---
+        // Left: Students
+        String[] studentCols = {"Student ID", "Roll No", "Name"};
         studentTableModel = new DefaultTableModel(studentCols, 0) {
-            @Override public boolean isCellEditable(int row, int column) { return false; }
+            @Override public boolean isCellEditable(int row, int col) { return false; }
         };
         studentTable = new JTable(studentTableModel);
         studentTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        JScrollPane studentScrollPane = new JScrollPane(studentTable);
+        JScrollPane studentScroll = new JScrollPane(studentTable);
 
-        // Grade Panel (Right)
+        // Right: Grades
         JPanel rightPanel = new JPanel(new BorderLayout(5, 5));
-        String[] gradeCols = {"Component", "Score"};
+
+        // REMOVED "Status" (Final Grade) column
+        String[] gradeCols = {"Component", "Score", "Max Marks", "Weightage %"};
         gradeTableModel = new DefaultTableModel(gradeCols, 0) {
-            @Override public boolean isCellEditable(int row, int column) { return false; }
+            @Override public boolean isCellEditable(int row, int col) { return false; }
         };
         gradeTable = new JTable(gradeTableModel);
-        JScrollPane gradeScrollPane = new JScrollPane(gradeTable);
+        JScrollPane gradeScroll = new JScrollPane(gradeTable);
 
-        // Grade Entry Form
-        gradeEntryPanel = new JPanel(new FlowLayout());
-        gradeEntryPanel.add(new JLabel("Component:"));
-        componentField = new JTextField(10);
+        // --- Grade Entry Form ---
+        gradeEntryPanel = new JPanel(new GridLayout(6, 2, 5, 5));
+        gradeEntryPanel.setBorder(BorderFactory.createTitledBorder("Manage Grades"));
+
+        gradeEntryPanel.add(new JLabel("Component Name:"));
+        componentField = new JTextField();
         gradeEntryPanel.add(componentField);
-        gradeEntryPanel.add(new JLabel("Score:"));
-        scoreField = new JTextField(5);
+
+        gradeEntryPanel.add(new JLabel("Score Obtained:"));
+        scoreField = new JTextField();
         gradeEntryPanel.add(scoreField);
+
+        gradeEntryPanel.add(new JLabel("Max Marks (e.g. 50):"));
+        maxMarksField = new JTextField();
+        gradeEntryPanel.add(maxMarksField);
+
+        gradeEntryPanel.add(new JLabel("Weightage % (e.g. 20):"));
+        weightageField = new JTextField();
+        gradeEntryPanel.add(weightageField);
+
+        gradeEntryPanel.add(new JLabel(""));
         saveGradeButton = new JButton("Save Grade");
         gradeEntryPanel.add(saveGradeButton);
-        gradeEntryPanel.setVisible(false); // Hide until a student is selected
+
+        gradeEntryPanel.add(new JLabel(""));
+        publishButton = new JButton("Compute & Publish Final Grade");
+        publishButton.setBackground(new Color(220, 255, 220));
+        gradeEntryPanel.add(publishButton);
+
+        gradeEntryPanel.setVisible(false);
 
         rightPanel.add(new JLabel("Grades for Selected Student", SwingConstants.CENTER), BorderLayout.NORTH);
-        rightPanel.add(gradeScrollPane, BorderLayout.CENTER);
+        rightPanel.add(gradeScroll, BorderLayout.CENTER);
         rightPanel.add(gradeEntryPanel, BorderLayout.SOUTH);
 
-        // Split Pane
-        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, studentScrollPane, rightPanel);
-        splitPane.setDividerLocation(300); // Initial divider position
+        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, studentScroll, rightPanel);
+        splitPane.setDividerLocation(300);
 
-        // --- Add main components to the panel ---
         add(topPanel, BorderLayout.NORTH);
         add(splitPane, BorderLayout.CENTER);
 
-        // --- Load Initial Data ---
+        // Listeners
         loadSectionSelector();
-
-        // --- Action Listeners ---
         sectionSelector.addActionListener(e -> loadStudentsForSelectedSection());
         studentTable.getSelectionModel().addListSelectionListener(e -> loadGradesForSelectedStudent());
         saveGradeButton.addActionListener(e -> performSaveGrade());
+        publishButton.addActionListener(e -> performPublishGrade());
     }
 
     private void loadSectionSelector() {
         try {
             int instructorId = UserSession.getInstance().getCurrentUser().getUserId();
             mySections = instructorService.getMySections(instructorId);
-
-            sectionSelector.removeAllItems(); // Clear old items
+            sectionSelector.removeAllItems();
             for (Section s : mySections) {
-                sectionSelector.addItem(s.getSectionId() + ": " + s.getCourseCode() + " - " + s.getCourseTitle());
+                sectionSelector.addItem(s.getSectionId() + ": " + s.getCourseCode());
             }
-            // ========= FIX #1 WAS HERE =========
-            // The getMySections() method is read-only and only throws SQLException.
-        } catch (SQLException e) {
-            showError("Error loading your sections: " + e.getMessage());
-        }
+        } catch (SQLException e) { showError("Error loading sections: " + e.getMessage()); }
     }
 
     private void loadStudentsForSelectedSection() {
-        int selectedIndex = sectionSelector.getSelectedIndex();
-        if (selectedIndex == -1) return;
+        int idx = sectionSelector.getSelectedIndex();
+        if (idx == -1) return;
+        Section sec = mySections.get(idx);
 
-        Section selectedSection = mySections.get(selectedIndex);
-        studentTableModel.setRowCount(0); // Clear student table
-        gradeTableModel.setRowCount(0); // Clear grade table
-        gradeEntryPanel.setVisible(false); // Hide grade form
+        studentTableModel.setRowCount(0);
+        gradeTableModel.setRowCount(0);
+        gradeEntryPanel.setVisible(false);
         studentToEnrollmentMap.clear();
 
         try {
-            // Get the list of Student objects
-            studentsInSection = instructorService.getStudentsBySection(selectedSection.getSectionId());
-            // Get the list of Enrollment objects (to map studentId -> enrollmentId)
-            enrollments = studentService.getMyEnrollments(0); // HACK: This is inefficient.
-            // We really need a new DAO method: getEnrollmentsBySectionId(sectionId)
-            // For now, let's just find the student we need.
-
+            studentsInSection = instructorService.getStudentsBySection(sec.getSectionId());
             for (Student s : studentsInSection) {
-                studentTableModel.addRow(new Object[]{s.getUserId(), s.getRollNo(), "stu" + s.getUserId()}); // Assuming username is like stuX
+                studentTableModel.addRow(new Object[]{s.getUserId(), s.getRollNo(), s.getUsername()});
             }
-        } catch (SQLException e) {
-            showError("Error loading students: " + e.getMessage());
-        }
+        } catch (SQLException e) { showError("Error loading students: " + e.getMessage()); }
     }
 
     private void loadGradesForSelectedStudent() {
-        int selectedRow = studentTable.getSelectedRow();
-        if (selectedRow == -1) {
+        int row = studentTable.getSelectedRow();
+        if (row == -1) {
             gradeEntryPanel.setVisible(false);
             return;
         }
 
         gradeTableModel.setRowCount(0);
-        gradeEntryPanel.setVisible(true); // Show the form
+        gradeEntryPanel.setVisible(true);
 
         try {
-            Student selectedStudent = studentsInSection.get(selectedRow);
+            Student s = studentsInSection.get(row);
 
-            // We need the enrollmentId. We must find it.
-            // This is a bit of a hack because our service isn't perfect.
-            // A better DAO would be getEnrollment(studentId, sectionId)
             int enrollmentId = -1;
-            List<Enrollment> allEnrollments = studentService.getMyEnrollments(selectedStudent.getUserId());
-            for(Enrollment enr : allEnrollments) {
-                if (enr.getSectionId() == mySections.get(sectionSelector.getSelectedIndex()).getSectionId()) {
-                    enrollmentId = enr.getEnrollmentId();
+            List<Enrollment> enrs = studentService.getMyEnrollments(s.getUserId());
+            int currentSecId = mySections.get(sectionSelector.getSelectedIndex()).getSectionId();
+
+            for(Enrollment e : enrs) {
+                if(e.getSectionId() == currentSecId) {
+                    enrollmentId = e.getEnrollmentId();
                     break;
                 }
             }
 
-            if (enrollmentId == -1) {
-                showError("Could not find enrollment for this student.");
-                return;
-            }
+            if(enrollmentId == -1) { showError("Enrollment not found"); return; }
+            studentToEnrollmentMap.put(s.getUserId(), enrollmentId);
 
-            // Store this for the save button
-            studentToEnrollmentMap.put(selectedStudent.getUserId(), enrollmentId);
-
-            // Now load the grades
             List<Grade> grades = instructorService.getGradesForEnrollment(enrollmentId);
             for (Grade g : grades) {
-                gradeTableModel.addRow(new Object[]{g.getComponent(), g.getScore()});
+                gradeTableModel.addRow(new Object[]{
+                        g.getComponent(),
+                        g.getScore(),
+                        g.getMaxMarks(),
+                        g.getWeightage()
+                        // Removed Final Grade from row
+                });
             }
 
-        } catch (SQLException e) {
-            showError("Error loading grades: " + e.getMessage());
-        }
+        } catch (SQLException e) { showError("Error: " + e.getMessage()); }
     }
 
     private void performSaveGrade() {
-        int selectedRow = studentTable.getSelectedRow();
-        if (selectedRow == -1) return;
+        int row = studentTable.getSelectedRow();
+        if (row == -1) return;
+        try {
+            String component = componentField.getText();
+            double score = Double.parseDouble(scoreField.getText());
+            double maxMarks = Double.parseDouble(maxMarksField.getText());
+            double weightage = Double.parseDouble(weightageField.getText());
+            if (component.isEmpty()) { showError("Component name required"); return; }
+            Student s = studentsInSection.get(row);
+            int enrollmentId = studentToEnrollmentMap.get(s.getUserId());
+            instructorService.submitGrade(enrollmentId, component, score, maxMarks, weightage);
+            JOptionPane.showMessageDialog(this, "Grade Saved!");
+            componentField.setText(""); scoreField.setText("");
+            maxMarksField.setText(""); weightageField.setText("");
+            loadGradesForSelectedStudent();
+        } catch (NumberFormatException e) { showError("Numbers required."); }
+        catch (SQLException | ServiceException e) { showError("Error: " + e.getMessage()); }
+    }
 
-        String component = componentField.getText();
-        String scoreText = scoreField.getText();
+    private void performPublishGrade() {
+        int row = studentTable.getSelectedRow();
+        if (row == -1) return;
 
-        if (component.isEmpty() || scoreText.isEmpty()) {
-            showError("Component and Score cannot be empty.");
-            return;
-        }
+        String input = JOptionPane.showInputDialog(this, "Enter Passing Percentage (e.g. 40):");
+        if (input == null || input.isEmpty()) return;
 
         try {
-            double score = Double.parseDouble(scoreText);
-            Student selectedStudent = studentsInSection.get(selectedRow);
-            int enrollmentId = studentToEnrollmentMap.get(selectedStudent.getUserId());
+            double passingThreshold = Double.parseDouble(input);
+            Student s = studentsInSection.get(row);
+            int enrollmentId = studentToEnrollmentMap.get(s.getUserId());
 
-            // Call the "brain"
-            instructorService.submitGrade(enrollmentId, component, score);
+            String finalStatus = instructorService.computeAndPublishFinalGrade(enrollmentId, passingThreshold);
 
-            // Success!
-            JOptionPane.showMessageDialog(this, "Grade saved successfully!");
-            componentField.setText("");
-            scoreField.setText("");
-            loadGradesForSelectedStudent(); // Refresh the grade table
+            JOptionPane.showMessageDialog(this, "Final Status Published: " + finalStatus);
+            loadGradesForSelectedStudent();
 
         } catch (NumberFormatException e) {
-            showError("Score must be a valid number.");
-            // ========= FIX #2 WAS HERE =========
-            // The submitGrade() method IS a write operation and CAN throw a ServiceException.
+            showError("Please enter a valid number for passing percentage.");
         } catch (SQLException | ServiceException e) {
-            showError("Error saving grade: " + e.getMessage());
+            showError("Error publishing: " + e.getMessage());
         }
     }
 
-    private void showError(String message) {
-        JOptionPane.showMessageDialog(this, message, "Error", JOptionPane.ERROR_MESSAGE);
+    private void showError(String msg) {
+        JOptionPane.showMessageDialog(this, msg, "Error", JOptionPane.ERROR_MESSAGE);
     }
 }

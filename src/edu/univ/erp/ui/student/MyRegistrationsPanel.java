@@ -2,9 +2,9 @@ package edu.univ.erp.ui.student;
 
 import edu.univ.erp.auth.UserSession;
 import edu.univ.erp.domain.Enrollment;
-import edu.univ.erp.domain.Section; // We might need this later
+import edu.univ.erp.domain.Section;
 import edu.univ.erp.service.StudentService;
-import edu.univ.erp.service.ServiceException; // ========= FIX #1: ADD THIS IMPORT =========
+import edu.univ.erp.service.ServiceException;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -21,6 +21,8 @@ public class MyRegistrationsPanel extends JPanel {
     private JButton dropButton;
 
     private StudentService studentService;
+    // We keep this list in memory so we can look up the Enrollment ID
+    // corresponding to the selected row index.
     private List<Enrollment> enrollmentList;
 
     public MyRegistrationsPanel() {
@@ -29,9 +31,8 @@ public class MyRegistrationsPanel extends JPanel {
         setLayout(new BorderLayout(10, 10));
 
         // --- Create the Table ---
-        // For now, we'll show simple IDs.
-        // A better version would join tables to show course names.
-        String[] columnNames = {"Enrollment ID", "Section ID", "Status"};
+        // CHANGED: First column is now "Course Code" instead of "Enrollment ID"
+        String[] columnNames = {"Course Code", "Section ID", "Status"};
         tableModel = new DefaultTableModel(columnNames, 0) {
             @Override
             public boolean isCellEditable(int row, int column) {
@@ -73,12 +74,24 @@ public class MyRegistrationsPanel extends JPanel {
             // Get current student's ID
             int studentId = UserSession.getInstance().getCurrentUser().getUserId();
 
-            // Call the "brain"
+            // 1. Fetch Enrollments (contains IDs needed for dropping)
             this.enrollmentList = studentService.getMyEnrollments(studentId);
 
+            // 2. Fetch Section Details (contains Course Codes needed for display)
+            List<Section> mySections = studentService.getMyTimetable(studentId);
+
             for (Enrollment enr : enrollmentList) {
+                // Find the matching section to get the Course Code
+                String courseCode = "Unknown"; // Fallback
+                for (Section sec : mySections) {
+                    if (sec.getSectionId() == enr.getSectionId()) {
+                        courseCode = sec.getCourseCode();
+                        break;
+                    }
+                }
+
                 Object[] row = {
-                        enr.getEnrollmentId(),
+                        courseCode,      // Display Course Code (e.g., "CS101")
                         enr.getSectionId(),
                         enr.getStatus()
                 };
@@ -100,8 +113,11 @@ public class MyRegistrationsPanel extends JPanel {
         }
 
         try {
-            // Get the ID from the table
-            int enrollmentId = (int) tableModel.getValueAt(selectedRow, 0);
+            // LOGIC CHANGE:
+            // We don't get the ID from the table anymore (because it's not there!).
+            // Instead, we get the Enrollment object from our list at the same index.
+            Enrollment selectedEnrollment = enrollmentList.get(selectedRow);
+            int enrollmentId = selectedEnrollment.getEnrollmentId();
 
             // Call the "brain"
             studentService.dropSection(enrollmentId);
@@ -113,7 +129,6 @@ public class MyRegistrationsPanel extends JPanel {
             // Refresh the table
             loadRegistrationData();
 
-            // ========= FIX #2: CHANGE THIS CATCH BLOCK =========
         } catch (ServiceException | SQLException ex) {
             JOptionPane.showMessageDialog(this, "Drop failed: " + ex.getMessage(),
                     "Drop Error", JOptionPane.ERROR_MESSAGE);
