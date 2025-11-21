@@ -9,6 +9,8 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 public class CourseManagementPanel extends JPanel {
 
@@ -20,19 +22,22 @@ public class CourseManagementPanel extends JPanel {
     private JButton createCourseButton;
 
     // --- Tab 2 Components (Create Section) ---
-    private JTextField secCourseId, secInstId, secRoom, secCap;
+    private JTextField secCourseId, secInstUsername, secRoom, secCap;
     private JButton createSectionButton;
-    // Schedule Builder Components
-    private JCheckBox[] dayCheckboxes;
-    private JTextField[] startFields;
-    private JTextField[] endFields;
-    private final String[] DAYS = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+    // Create Schedule Components
+    private JCheckBox[] createCheckboxes;
+    private JTextField[] createStartFields, createEndFields;
 
     // --- Tab 3 Components (Edit Section) ---
     private JComboBox<String> sectionSelector;
-    private JTextField editCourseId, editInstId, editDayTime, editRoom, editCap, editSem, editYear;
+    private JTextField editCourseId, editInstUsername, editRoom, editCap, editSem, editYear;
     private JButton updateSectionButton;
     private List<Section> allSections;
+    // Edit Schedule Components
+    private JCheckBox[] editCheckboxes;
+    private JTextField[] editStartFields, editEndFields;
+
+    private final String[] DAYS = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 
     public CourseManagementPanel() {
         this.adminService = new AdminService();
@@ -69,49 +74,22 @@ public class CourseManagementPanel extends JPanel {
         // TAB 2: CREATE NEW SECTION (With Schedule Builder)
         // ==================================================
         JPanel tab2 = new JPanel(new GridBagLayout());
-        // Reusing gbc constraints
         gbc.gridx=0; gbc.gridy=0; tab2.add(new JLabel("Course ID:"), gbc);
         secCourseId = new JTextField(10); gbc.gridx=1; tab2.add(secCourseId, gbc);
 
-        gbc.gridx=0; gbc.gridy=1; tab2.add(new JLabel("Instructor ID:"), gbc);
-        secInstId = new JTextField(10); gbc.gridx=1; tab2.add(secInstId, gbc);
+        gbc.gridx=0; gbc.gridy=1; tab2.add(new JLabel("Instructor Username:"), gbc);
+        secInstUsername = new JTextField(10); gbc.gridx=1; tab2.add(secInstUsername, gbc);
 
-        // --- Schedule Builder UI ---
+        // --- Schedule Builder (Create) ---
         gbc.gridx=0; gbc.gridy=2; tab2.add(new JLabel("Schedule:"), gbc);
 
-        JPanel schedulePanel = new JPanel(new GridLayout(6, 1, 2, 2));
-        dayCheckboxes = new JCheckBox[6];
-        startFields = new JTextField[6];
-        endFields = new JTextField[6];
+        JPanel createSchedPanel = new JPanel(new GridLayout(6, 1, 2, 2));
+        createCheckboxes = new JCheckBox[6];
+        createStartFields = new JTextField[6];
+        createEndFields = new JTextField[6];
+        initScheduleComponents(createSchedPanel, createCheckboxes, createStartFields, createEndFields);
 
-        for (int i = 0; i < 6; i++) {
-            JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-
-            dayCheckboxes[i] = new JCheckBox(DAYS[i]);
-            dayCheckboxes[i].setPreferredSize(new Dimension(55, 25));
-
-            startFields[i] = new JTextField("10:00", 5);
-            endFields[i] = new JTextField("10:50", 5);
-
-            startFields[i].setEnabled(false);
-            endFields[i].setEnabled(false);
-
-            int finalI = i;
-            dayCheckboxes[i].addActionListener(e -> {
-                boolean isSelected = dayCheckboxes[finalI].isSelected();
-                startFields[finalI].setEnabled(isSelected);
-                endFields[finalI].setEnabled(isSelected);
-            });
-
-            row.add(dayCheckboxes[i]);
-            row.add(startFields[i]);
-            row.add(new JLabel("-"));
-            row.add(endFields[i]);
-
-            schedulePanel.add(row);
-        }
-        gbc.gridx=1; gbc.gridy=2; tab2.add(schedulePanel, gbc);
-        // ---------------------------
+        gbc.gridx=1; gbc.gridy=2; tab2.add(createSchedPanel, gbc);
 
         gbc.gridx=0; gbc.gridy=3; tab2.add(new JLabel("Room:"), gbc);
         secRoom = new JTextField(10); gbc.gridx=1; tab2.add(secRoom, gbc);
@@ -125,7 +103,7 @@ public class CourseManagementPanel extends JPanel {
         tabbedPane.addTab("Create New Section", tab2);
 
         // ==================================================
-        // TAB 3: EDIT EXISTING SECTION
+        // TAB 3: EDIT EXISTING SECTION (With Schedule Builder)
         // ==================================================
         JPanel tab3 = new JPanel(new GridBagLayout());
 
@@ -136,12 +114,20 @@ public class CourseManagementPanel extends JPanel {
         gbc.gridx=0; gbc.gridy=1; tab3.add(new JLabel("Course ID:"), gbc);
         editCourseId = new JTextField(10); gbc.gridx=1; tab3.add(editCourseId, gbc);
 
-        gbc.gridx=0; gbc.gridy=2; tab3.add(new JLabel("Instructor ID:"), gbc);
-        editInstId = new JTextField(10); gbc.gridx=1; tab3.add(editInstId, gbc);
+        gbc.gridx=0; gbc.gridy=2; tab3.add(new JLabel("Instructor Username:"), gbc);
+        editInstUsername = new JTextField(10); gbc.gridx=1; tab3.add(editInstUsername, gbc);
 
-        gbc.gridx=0; gbc.gridy=3; tab3.add(new JLabel("Day/Time (Text):"), gbc);
-        editDayTime = new JTextField(20); // Simple text edit for simplicity
-        gbc.gridx=1; tab3.add(editDayTime, gbc);
+        // --- Schedule Builder (Edit) ---
+        gbc.gridx=0; gbc.gridy=3; tab3.add(new JLabel("Schedule:"), gbc);
+
+        JPanel editSchedPanel = new JPanel(new GridLayout(6, 1, 2, 2));
+        editCheckboxes = new JCheckBox[6];
+        editStartFields = new JTextField[6];
+        editEndFields = new JTextField[6];
+        initScheduleComponents(editSchedPanel, editCheckboxes, editStartFields, editEndFields);
+
+        gbc.gridx=1; gbc.gridy=3; tab3.add(editSchedPanel, gbc);
+        // -------------------------------
 
         gbc.gridx=0; gbc.gridy=4; tab3.add(new JLabel("Room:"), gbc);
         editRoom = new JTextField(10); gbc.gridx=1; tab3.add(editRoom, gbc);
@@ -166,7 +152,6 @@ public class CourseManagementPanel extends JPanel {
         createCourseButton.addActionListener(e -> performCreateCourse());
         createSectionButton.addActionListener(e -> performCreateSection());
 
-        // Refresh dropdown when clicking the Edit Tab
         tabbedPane.addChangeListener(e -> {
             if (tabbedPane.getSelectedIndex() == 2) {
                 loadSectionSelector();
@@ -177,19 +162,110 @@ public class CourseManagementPanel extends JPanel {
         updateSectionButton.addActionListener(e -> performUpdateSection());
     }
 
-    // --- Helper to build the time string from checkboxes ---
-    private String buildScheduleString() {
+    // Helper to create the 6-row schedule UI
+    private void initScheduleComponents(JPanel panel, JCheckBox[] checks, JTextField[] starts, JTextField[] ends) {
+        for (int i = 0; i < 6; i++) {
+            JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+            checks[i] = new JCheckBox(DAYS[i]);
+            checks[i].setPreferredSize(new Dimension(55, 25));
+
+            starts[i] = new JTextField("10:00", 5);
+            ends[i] = new JTextField("10:50", 5);
+
+            starts[i].setEnabled(false);
+            ends[i].setEnabled(false);
+
+            int finalI = i;
+            checks[i].addActionListener(e -> {
+                boolean isSelected = checks[finalI].isSelected();
+                starts[finalI].setEnabled(isSelected);
+                ends[finalI].setEnabled(isSelected);
+            });
+
+            row.add(checks[i]);
+            row.add(starts[i]);
+            row.add(new JLabel("-"));
+            row.add(ends[i]);
+            panel.add(row);
+        }
+    }
+
+    // Helper to turn Checkboxes -> String "Mon 10:00-11:00, ..."
+    private String buildScheduleString(JCheckBox[] checks, JTextField[] starts, JTextField[] ends) {
         StringBuilder sb = new StringBuilder();
         boolean first = true;
         for (int i = 0; i < 6; i++) {
-            if (dayCheckboxes[i].isSelected()) {
+            if (checks[i].isSelected()) {
                 if (!first) sb.append(", ");
-                sb.append(DAYS[i]).append(" ").append(startFields[i].getText())
-                        .append("-").append(endFields[i].getText());
+                sb.append(DAYS[i]).append(" ").append(starts[i].getText())
+                        .append("-").append(ends[i].getText());
                 first = false;
             }
         }
         return sb.toString();
+    }
+
+    // --- NEW SMART PARSER: Handles "MWF" AND "Mon 10:00..." ---
+    private void parseScheduleStringToUI(String schedule) {
+        // 1. Reset all fields first
+        for(int i=0; i<6; i++) {
+            editCheckboxes[i].setSelected(false);
+            editStartFields[i].setEnabled(false);
+            editEndFields[i].setEnabled(false);
+            editStartFields[i].setText("10:00");
+            editEndFields[i].setText("10:50");
+        }
+
+        if(schedule == null || schedule.isEmpty()) return;
+
+        // CASE 1: New Format (Comma Separated) -> "Mon 10:00-10:50, Wed..."
+        if (schedule.contains(",")) {
+            String[] daySegments = schedule.split(",");
+            for (String segment : daySegments) {
+                segment = segment.trim();
+                String[] parts = segment.split(" "); // ["Mon", "10:00-10:50"]
+                if(parts.length < 2) continue;
+
+                String day = parts[0];
+                String timeRange = parts[1];
+                String[] times = timeRange.split("-");
+                String start = times.length > 0 ? times[0] : "";
+                String end = times.length > 1 ? times[1] : "";
+
+                setDayActive(day, start, end);
+            }
+        }
+        // CASE 2: Old Format -> "MWF 10:00-10:50"
+        else {
+            String[] parts = schedule.split(" ", 2);
+            if(parts.length >= 2) {
+                String days = parts[0]; // "MWF"
+                String timeRange = parts[1]; // "10:00-10:50"
+                String[] times = timeRange.split("-");
+                String start = times.length > 0 ? times[0] : "";
+                String end = times.length > 1 ? times[1] : "";
+
+                if (days.contains("M")) setDayActive("Mon", start, end);
+                if (days.contains("Th")) { setDayActive("Thu", start, end); days = days.replace("Th", ""); }
+                if (days.contains("T")) setDayActive("Tue", start, end);
+                if (days.contains("W")) setDayActive("Wed", start, end);
+                if (days.contains("F")) setDayActive("Fri", start, end);
+                if (days.contains("S")) setDayActive("Sat", start, end);
+            }
+        }
+    }
+
+    private void setDayActive(String dayName, String start, String end) {
+        for(int i=0; i<DAYS.length; i++) {
+            if(DAYS[i].equals(dayName)) {
+                editCheckboxes[i].setSelected(true);
+                editStartFields[i].setEnabled(true);
+                editEndFields[i].setEnabled(true);
+                editStartFields[i].setText(start);
+                editEndFields[i].setText(end);
+                break;
+            }
+        }
     }
 
     private void performCreateCourse() {
@@ -206,21 +282,20 @@ public class CourseManagementPanel extends JPanel {
     private void performCreateSection() {
         try {
             int cid = Integer.parseInt(secCourseId.getText());
-            int iid = Integer.parseInt(secInstId.getText());
-            String dt = buildScheduleString(); // Use the builder!
+            String instUser = secInstUsername.getText();
             String rm = secRoom.getText();
             int cap = Integer.parseInt(secCap.getText());
+            String dt = buildScheduleString(createCheckboxes, createStartFields, createEndFields);
 
             if (dt.isEmpty()) { showError("Select at least one day."); return; }
 
-            adminService.createSection(cid, iid, dt, rm, cap);
-            JOptionPane.showMessageDialog(this, "Section Created:\n" + dt);
+            adminService.createSection(cid, instUser, dt, rm, cap);
+            JOptionPane.showMessageDialog(this, "Section Created!");
 
-            // Clear inputs
-            secCourseId.setText(""); secInstId.setText(""); secRoom.setText(""); secCap.setText("");
+            secCourseId.setText(""); secInstUsername.setText(""); secRoom.setText(""); secCap.setText("");
             for(int i=0; i<6; i++) {
-                dayCheckboxes[i].setSelected(false);
-                startFields[i].setEnabled(false);
+                createCheckboxes[i].setSelected(false);
+                createStartFields[i].setEnabled(false);
             }
         } catch (Exception e) { showError(e.getMessage()); }
     }
@@ -241,12 +316,14 @@ public class CourseManagementPanel extends JPanel {
 
         Section s = allSections.get(idx);
         editCourseId.setText(String.valueOf(s.getCourseId()));
-        editInstId.setText(String.valueOf(s.getInstructorId()));
-        editDayTime.setText(s.getDayTime());
+        editInstUsername.setText(s.getInstructorName());
         editRoom.setText(s.getRoom());
         editCap.setText(String.valueOf(s.getCapacity()));
         editSem.setText(s.getSemester());
         editYear.setText(String.valueOf(s.getYear()));
+
+        // --- Populate the Schedule Builder ---
+        parseScheduleStringToUI(s.getDayTime());
     }
 
     private void performUpdateSection() {
@@ -256,14 +333,16 @@ public class CourseManagementPanel extends JPanel {
             int sectionId = allSections.get(idx).getSectionId();
 
             int cid = Integer.parseInt(editCourseId.getText());
-            int iid = Integer.parseInt(editInstId.getText());
-            String dt = editDayTime.getText();
+            String instUser = editInstUsername.getText();
             String rm = editRoom.getText();
             int cap = Integer.parseInt(editCap.getText());
             String sem = editSem.getText();
             int yr = Integer.parseInt(editYear.getText());
 
-            adminService.updateSection(sectionId, cid, iid, dt, rm, cap, sem, yr);
+            String dt = buildScheduleString(editCheckboxes, editStartFields, editEndFields);
+            if (dt.isEmpty()) { showError("Select at least one day."); return; }
+
+            adminService.updateSection(sectionId, cid, instUser, dt, rm, cap, sem, yr);
             JOptionPane.showMessageDialog(this, "Section Updated!");
             loadSectionSelector();
 

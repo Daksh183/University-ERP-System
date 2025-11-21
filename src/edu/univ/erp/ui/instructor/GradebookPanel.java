@@ -10,6 +10,7 @@ import edu.univ.erp.service.StudentService;
 import edu.univ.erp.service.ServiceException;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.sql.SQLException;
@@ -55,28 +56,47 @@ public class GradebookPanel extends JPanel {
         topPanel.add(sectionSelector);
 
         // --- Center: Split Pane ---
-        // Left: Students
-        String[] studentCols = {"Student ID", "Roll No", "Name"};
+
+        // 1. LEFT SIDE (Students List + Publish Button)
+        JPanel leftPanel = new JPanel(new BorderLayout(5, 5));
+
+        String[] studentCols = {"Roll No", "Name"};
         studentTableModel = new DefaultTableModel(studentCols, 0) {
             @Override public boolean isCellEditable(int row, int col) { return false; }
         };
         studentTable = new JTable(studentTableModel);
+        styleTable(studentTable);
         studentTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        JScrollPane studentScroll = new JScrollPane(studentTable);
 
-        // Right: Grades
+        // Scroll pane handles the scrolling automatically
+        JScrollPane studentScroll = new JScrollPane(studentTable);
+        leftPanel.add(studentScroll, BorderLayout.CENTER);
+
+        // Publish Button (Moved to bottom of left panel)
+        publishButton = new JButton("Publish Grades for Class");
+        publishButton.setBackground(new Color(40, 167, 69)); // Dark Green
+        publishButton.setForeground(Color.WHITE);
+        publishButton.setFocusPainted(false);
+
+        // Wrapper for button padding
+        JPanel btnWrapper = new JPanel(new FlowLayout(FlowLayout.CENTER));
+        btnWrapper.add(publishButton);
+        leftPanel.add(btnWrapper, BorderLayout.SOUTH);
+
+
+        // 2. RIGHT SIDE (Individual Student Grades)
         JPanel rightPanel = new JPanel(new BorderLayout(5, 5));
 
-        // REMOVED "Status" (Final Grade) column
         String[] gradeCols = {"Component", "Score", "Max Marks", "Weightage %"};
         gradeTableModel = new DefaultTableModel(gradeCols, 0) {
             @Override public boolean isCellEditable(int row, int col) { return false; }
         };
         gradeTable = new JTable(gradeTableModel);
+        styleTable(gradeTable);
         JScrollPane gradeScroll = new JScrollPane(gradeTable);
 
         // --- Grade Entry Form ---
-        gradeEntryPanel = new JPanel(new GridLayout(6, 2, 5, 5));
+        gradeEntryPanel = new JPanel(new GridLayout(5, 2, 5, 5)); // Reduced rows (removed publish)
         gradeEntryPanel.setBorder(BorderFactory.createTitledBorder("Manage Grades"));
 
         gradeEntryPanel.add(new JLabel("Component Name:"));
@@ -99,18 +119,14 @@ public class GradebookPanel extends JPanel {
         saveGradeButton = new JButton("Save Grade");
         gradeEntryPanel.add(saveGradeButton);
 
-        gradeEntryPanel.add(new JLabel(""));
-        publishButton = new JButton("Compute & Publish Final Grade");
-        publishButton.setBackground(new Color(220, 255, 220));
-        gradeEntryPanel.add(publishButton);
-
         gradeEntryPanel.setVisible(false);
 
         rightPanel.add(new JLabel("Grades for Selected Student", SwingConstants.CENTER), BorderLayout.NORTH);
         rightPanel.add(gradeScroll, BorderLayout.CENTER);
         rightPanel.add(gradeEntryPanel, BorderLayout.SOUTH);
 
-        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, studentScroll, rightPanel);
+        // Split Pane connects Left (List+Button) and Right (Details)
+        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, leftPanel, rightPanel);
         splitPane.setDividerLocation(300);
 
         add(topPanel, BorderLayout.NORTH);
@@ -122,6 +138,18 @@ public class GradebookPanel extends JPanel {
         studentTable.getSelectionModel().addListSelectionListener(e -> loadGradesForSelectedStudent());
         saveGradeButton.addActionListener(e -> performSaveGrade());
         publishButton.addActionListener(e -> performPublishGrade());
+    }
+
+    private void styleTable(JTable table) {
+        table.setShowGrid(true);
+        table.setGridColor(new Color(100, 100, 100));
+        table.setIntercellSpacing(new Dimension(1, 1));
+        table.setRowHeight(30);
+        ((DefaultTableCellRenderer)table.getTableHeader().getDefaultRenderer()).setHorizontalAlignment(JLabel.CENTER);
+        DefaultTableCellRenderer leftRenderer = new DefaultTableCellRenderer();
+        leftRenderer.setHorizontalAlignment(JLabel.LEFT);
+        leftRenderer.setBorder(BorderFactory.createEmptyBorder(0, 5, 0, 0));
+        table.setDefaultRenderer(Object.class, leftRenderer);
     }
 
     private void loadSectionSelector() {
@@ -148,7 +176,7 @@ public class GradebookPanel extends JPanel {
         try {
             studentsInSection = instructorService.getStudentsBySection(sec.getSectionId());
             for (Student s : studentsInSection) {
-                studentTableModel.addRow(new Object[]{s.getUserId(), s.getRollNo(), s.getUsername()});
+                studentTableModel.addRow(new Object[]{s.getRollNo(), s.getUsername()});
             }
         } catch (SQLException e) { showError("Error loading students: " + e.getMessage()); }
     }
@@ -187,7 +215,6 @@ public class GradebookPanel extends JPanel {
                         g.getScore(),
                         g.getMaxMarks(),
                         g.getWeightage()
-                        // Removed Final Grade from row
                 });
             }
 
@@ -215,26 +242,54 @@ public class GradebookPanel extends JPanel {
     }
 
     private void performPublishGrade() {
-        int row = studentTable.getSelectedRow();
-        if (row == -1) return;
+        // We don't need a row selected to publish for the whole class
+        // But we do need a section selected
+        if (sectionSelector.getSelectedIndex() == -1) return;
 
-        String input = JOptionPane.showInputDialog(this, "Enter Passing Percentage (e.g. 40):");
-        if (input == null || input.isEmpty()) return;
+        // Ask Instructor for Grading Scale
+        JPanel panel = new JPanel(new GridLayout(7, 2, 5, 5));
+        JTextField fieldA = new JTextField("90");
+        JTextField fieldAm = new JTextField("85");
+        JTextField fieldB = new JTextField("80");
+        JTextField fieldBm = new JTextField("75");
+        JTextField fieldC = new JTextField("70");
+        JTextField fieldCm = new JTextField("60");
+        JTextField fieldD = new JTextField("50");
 
-        try {
-            double passingThreshold = Double.parseDouble(input);
-            Student s = studentsInSection.get(row);
-            int enrollmentId = studentToEnrollmentMap.get(s.getUserId());
+        panel.add(new JLabel("Min for A:")); panel.add(fieldA);
+        panel.add(new JLabel("Min for A-:")); panel.add(fieldAm);
+        panel.add(new JLabel("Min for B:")); panel.add(fieldB);
+        panel.add(new JLabel("Min for B-:")); panel.add(fieldBm);
+        panel.add(new JLabel("Min for C:")); panel.add(fieldC);
+        panel.add(new JLabel("Min for C-:")); panel.add(fieldCm);
+        panel.add(new JLabel("Min for D:")); panel.add(fieldD);
 
-            String finalStatus = instructorService.computeAndPublishFinalGrade(enrollmentId, passingThreshold);
+        int result = JOptionPane.showConfirmDialog(this, panel,
+                "Publish Grades for Class", JOptionPane.OK_CANCEL_OPTION);
 
-            JOptionPane.showMessageDialog(this, "Final Status Published: " + finalStatus);
-            loadGradesForSelectedStudent();
+        if (result == JOptionPane.OK_OPTION) {
+            try {
+                Map<String, Double> cutoffs = new HashMap<>();
+                cutoffs.put("A", Double.parseDouble(fieldA.getText()));
+                cutoffs.put("A-", Double.parseDouble(fieldAm.getText()));
+                cutoffs.put("B", Double.parseDouble(fieldB.getText()));
+                cutoffs.put("B-", Double.parseDouble(fieldBm.getText()));
+                cutoffs.put("C", Double.parseDouble(fieldC.getText()));
+                cutoffs.put("C-", Double.parseDouble(fieldCm.getText()));
+                cutoffs.put("D", Double.parseDouble(fieldD.getText()));
 
-        } catch (NumberFormatException e) {
-            showError("Please enter a valid number for passing percentage.");
-        } catch (SQLException | ServiceException e) {
-            showError("Error publishing: " + e.getMessage());
+                int idx = sectionSelector.getSelectedIndex();
+                Section sec = mySections.get(idx);
+
+                instructorService.publishAllGrades(sec.getSectionId(), cutoffs);
+
+                JOptionPane.showMessageDialog(this, "All grades published successfully!");
+
+            } catch (NumberFormatException e) {
+                showError("Invalid number entered for cutoff.");
+            } catch (SQLException | ServiceException e) {
+                showError("Error publishing: " + e.getMessage());
+            }
         }
     }
 

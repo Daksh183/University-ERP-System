@@ -3,85 +3,158 @@ package edu.univ.erp.auth;
 import edu.univ.erp.data.DatabaseConnector;
 import edu.univ.erp.domain.User;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement; // <-- This import was added
+import java.sql.*;
 
-// This is the IMPLEMENTATION (the real work)
 public class AuthDAOImpl implements AuthDAO {
+
+    private static final long LOCKOUT_DURATION_MS = 60 * 1000; // 1 Minute
 
     @Override
     public User login(String username, String password) throws SQLException, AuthException {
-        // SQL to find the user and their hash in the Auth DB
-        String sql = "SELECT user_id, role, password_hash FROM users_auth WHERE username = ?";
+        String sql = "SELECT user_id, role, password_hash, status, failed_attempts, lockout_time FROM users_auth WHERE username = ?";
 
-        // Step 1: Connect to the Auth DB
         try (Connection conn = DatabaseConnector.getAuthConnection();
              PreparedStatement stmt = conn.prepareStatement(sql)) {
 
             stmt.setString(1, username);
 
-            // Step 2: Run the query
             try (ResultSet rs = stmt.executeQuery()) {
-
-                // Step 3: Check if we found a user
                 if (rs.next()) {
-                    // A user with this username exists.
-                    // Now, get the stored hash from the database.
+                    int userId = rs.getInt("user_id");
+                    String role = rs.getString("role");
                     String storedHash = rs.getString("password_hash");
+                    int attempts = rs.getInt("failed_attempts");
+                    Timestamp lockoutTime = rs.getTimestamp("lockout_time");
 
-                    // Step 4: Check the password with jBCrypt
+                    // 1. CHECK LOCKOUT STATUS
+                    if (attempts >= 5) {
+                        if (lockoutTime != null) {
+                            long timeDiff = System.currentTimeMillis() - lockoutTime.getTime();
+                            if (timeDiff < LOCKOUT_DURATION_MS) {
+                                long secondsLeft = (LOCKOUT_DURATION_MS - timeDiff) / 1000;
+                                // Throw exception WITH time info
+                                throw new AuthException("Account locked.", secondsLeft);
+                            } else {
+                                // Timer expired! Auto-unlock
+                                resetFailedAttempts(userId);
+                                attempts = 0;
+                            }
+                        }
+                    }
+
+                    // 2. VERIFY PASSWORD
                     if (PasswordHasher.checkPassword(password, storedHash)) {
-                        // Password is correct!
-                        // Get the user's details
-                        int userId = rs.getInt("user_id");
-                        String role = rs.getString("role");
-
-                        // Create and return a User domain object
+                        if (attempts > 0) resetFailedAttempts(userId);
                         return new User(userId, username, role);
                     } else {
-                        // Password was wrong
-                        throw new AuthException("Incorrect username or password.");
+                        // 3. HANDLE FAILURE
+                        int newAttempts = attempts + 1;
+                        handleFailedLogin(userId, newAttempts);
+
+                        if (newAttempts >= 5) {
+                            // Immediate feedback on the 5th fail
+                            throw new AuthException("Account is now LOCKED.", 60);
+                        } else {
+                            throw new AuthException("Incorrect username or password.");
+                        }
                     }
                 } else {
-                    // No user with that username was found
                     throw new AuthException("Incorrect username or password.");
                 }
             }
         }
     }
 
-    /**
-     * Creates a new user in the Auth DB.
-     * @return The auto-generated user_id, or -1 on failure.
-     */
-    @Override
-    public int createUser(String username, String role, String passwordHash) throws SQLException {
-        String sql = "INSERT INTO users_auth (username, role, password_hash) VALUES (?, ?, ?)";
+    private void handleFailedLogin(int userId, int newCount) throws SQLException {
+        String sql;
+        if (newCount >= 5) {
+            // Lock it now! Set the timestamp.
+            sql = "UPDATE users_auth SET failed_attempts = ?, status = 'Locked', lockout_time = NOW() WHERE user_id = ?";
+        } else {
+            // Just increment
+            sql = "UPDATE users_auth SET failed_attempts = ? WHERE user_id = ?";
+        }
 
         try (Connection conn = DatabaseConnector.getAuthConnection();
-             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, newCount);
+            stmt.setInt(2, userId);
+            stmt.executeUpdate();
+        }
+    }
 
+    private void resetFailedAttempts(int userId) throws SQLException {
+        // Clear attempts and the timestamp
+        String sql = "UPDATE users_auth SET failed_attempts = 0, status = 'Active', lockout_time = NULL WHERE user_id = ?";
+        try (Connection conn = DatabaseConnector.getAuthConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, userId);
+            stmt.executeUpdate();
+        }
+    }
+
+    @Override
+    public int createUser(String username, String role, String passwordHash) throws SQLException {
+        String sql = "INSERT INTO users_auth (username, role, password_hash, status, failed_attempts) VALUES (?, ?, ?, 'Active', 0)";
+        try (Connection conn = DatabaseConnector.getAuthConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             stmt.setString(1, username);
             stmt.setString(2, role);
             stmt.setString(3, passwordHash);
-
-            int rowsAffected = stmt.executeUpdate();
-
-            if (rowsAffected == 0) {
-                return -1; // Insert failed
+            int rows = stmt.executeUpdate();
+            if (rows == 0) return -1;
+            try (ResultSet gk = stmt.getGeneratedKeys()) {
+                if (gk.next()) return gk.getInt(1); else return -1;
             }
+        }
+    }
 
-            // Get the generated user_id
-            try (ResultSet generatedKeys = stmt.getGeneratedKeys()) {
-                if (generatedKeys.next()) {
-                    return generatedKeys.getInt(1); // Return the new user_id
-                } else {
-                    return -1; // Failed to get ID
-                }
+    @Override
+    public int getUserIdByUsername(String username) throws SQLException {
+        String sql = "SELECT user_id FROM users_auth WHERE username = ?";
+        try (Connection conn = DatabaseConnector.getAuthConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, username);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) return rs.getInt("user_id");
             }
+        }
+        return -1;
+    }
+
+    @Override
+    public String getPasswordHash(int userId) throws SQLException {
+        String sql = "SELECT password_hash FROM users_auth WHERE user_id = ?";
+        try (Connection conn = DatabaseConnector.getAuthConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, userId);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) return rs.getString("password_hash");
+            }
+        }
+        return null;
+    }
+
+    @Override
+    public void updatePassword(int userId, String newHash) throws SQLException {
+        // Resetting password also UNLOCKS the account
+        String sql = "UPDATE users_auth SET password_hash = ?, status = 'Active', failed_attempts = 0 WHERE user_id = ?";
+        try (Connection conn = DatabaseConnector.getAuthConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, newHash);
+            stmt.setInt(2, userId);
+            stmt.executeUpdate();
+        }
+    }
+
+    @Override
+    public void updateUsername(int userId, String newUsername) throws SQLException {
+        String sql = "UPDATE users_auth SET username = ? WHERE user_id = ?";
+        try (Connection conn = DatabaseConnector.getAuthConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, newUsername);
+            stmt.setInt(2, userId);
+            stmt.executeUpdate();
         }
     }
 }

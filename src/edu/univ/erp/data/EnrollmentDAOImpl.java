@@ -1,7 +1,7 @@
 package edu.univ.erp.data;
 
 import edu.univ.erp.domain.Enrollment;
-import edu.univ.erp.domain.Section;
+import edu.univ.erp.domain.Section; // <--- THIS WAS MISSING
 import edu.univ.erp.domain.Student;
 
 import java.sql.Connection;
@@ -109,7 +109,7 @@ public class EnrollmentDAOImpl implements EnrollmentDAO {
     public List<Student> getStudentsBySectionId(int sectionId) throws SQLException {
         List<Student> students = new ArrayList<>();
 
-        // FIXED: Added "university_auth_db." prefix to join across databases
+        // Added "university_auth_db." prefix to join across databases
         String sql = "SELECT s.*, u.username FROM students s " +
                 "JOIN enrollments e ON s.user_id = e.student_id " +
                 "JOIN university_auth_db.users_auth u ON s.user_id = u.user_id " +

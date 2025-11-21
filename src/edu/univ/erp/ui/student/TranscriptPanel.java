@@ -7,6 +7,7 @@ import edu.univ.erp.domain.Section;
 import edu.univ.erp.service.StudentService;
 
 import javax.swing.*;
+import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.io.File;
@@ -42,6 +43,22 @@ public class TranscriptPanel extends JPanel {
         transcriptTable = new JTable(tableModel);
         transcriptTable.setFillsViewportHeight(true);
 
+        // --- STYLING START ---
+        transcriptTable.setShowGrid(true);
+        transcriptTable.setGridColor(new Color(100, 100, 100)); // Gray Grid
+        transcriptTable.setIntercellSpacing(new Dimension(1, 1));
+        transcriptTable.setRowHeight(35); // Comfortable height
+
+        // Header: Center Aligned
+        ((DefaultTableCellRenderer)transcriptTable.getTableHeader().getDefaultRenderer()).setHorizontalAlignment(JLabel.CENTER);
+
+        // Data: Left Aligned + Padding
+        DefaultTableCellRenderer leftRenderer = new DefaultTableCellRenderer();
+        leftRenderer.setHorizontalAlignment(JLabel.LEFT);
+        leftRenderer.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0)); // 10px padding left
+        transcriptTable.setDefaultRenderer(Object.class, leftRenderer);
+        // --- STYLING END ---
+
         JScrollPane scrollPane = new JScrollPane(transcriptTable);
         add(scrollPane, BorderLayout.CENTER);
 
@@ -55,6 +72,11 @@ public class TranscriptPanel extends JPanel {
         downloadButton.addActionListener(e -> generateTranscriptCSV());
 
         // Load data immediately
+        refreshData();
+    }
+
+    // --- REQUIRED METHOD FOR DASHBOARD REFRESH ---
+    public void refreshData() {
         loadTranscriptData();
     }
 
@@ -103,7 +125,9 @@ public class TranscriptPanel extends JPanel {
                 }
             }
         } catch (SQLException e) {
-            JOptionPane.showMessageDialog(this, "Error loading transcript: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            if(this.isShowing()) {
+                JOptionPane.showMessageDialog(this, "Error loading transcript: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+            }
         }
     }
 

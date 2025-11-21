@@ -17,88 +17,56 @@ import java.sql.SQLException;
 
 public class LoginWindow extends JFrame {
 
-    // 1. Declare the UI components
     private JTextField usernameField;
     private JPasswordField passwordField;
     private JButton loginButton;
     private JLabel statusLabel;
-
-    // 2. Declare our login "brain" (the AuthDAO)
     private AuthDAO authDAO;
+    private Timer lockoutTimer; // To handle the countdown
 
     public LoginWindow() {
-        this.authDAO = new AuthDAOImpl(); // Create an instance of our login logic
+        this.authDAO = new AuthDAOImpl();
 
-        // --- Basic Window Setup ---
         setTitle("University ERP - Login");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setMinimumSize(new Dimension(400, 300));
         setLocationRelativeTo(null);
 
-        // --- Create the Form (using a JPanel) ---
         JPanel panel = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 5, 5, 5); // Padding
+        gbc.insets = new Insets(5, 5, 5, 5);
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
-        // Username Label
-        gbc.gridx = 0;
-        gbc.gridy = 0;
+        gbc.gridx = 0; gbc.gridy = 0;
         panel.add(new JLabel("Username:"), gbc);
 
-        // Username Text Field
         usernameField = new JTextField(20);
-        gbc.gridx = 1;
-        gbc.gridy = 0;
+        gbc.gridx = 1; gbc.gridy = 0;
         panel.add(usernameField, gbc);
 
-        // Password Label
-        gbc.gridx = 0;
-        gbc.gridy = 1;
+        gbc.gridx = 0; gbc.gridy = 1;
         panel.add(new JLabel("Password:"), gbc);
 
-        // Password Field
         passwordField = new JPasswordField(20);
-        gbc.gridx = 1;
-        gbc.gridy = 1;
+        gbc.gridx = 1; gbc.gridy = 1;
         panel.add(passwordField, gbc);
 
-        // Login Button
         loginButton = new JButton("Login");
-        gbc.gridx = 0;
-        gbc.gridy = 2;
-        gbc.gridwidth = 2; // Span 2 columns
-        gbc.fill = GridBagConstraints.NONE;
+        gbc.gridx = 0; gbc.gridy = 2; gbc.gridwidth = 2; gbc.fill = GridBagConstraints.NONE;
         panel.add(loginButton, gbc);
 
-        // Status Label (for error messages)
         statusLabel = new JLabel(" ", SwingConstants.CENTER);
         statusLabel.setForeground(Color.RED);
-        gbc.gridx = 0;
-        gbc.gridy = 3;
-        gbc.gridwidth = 2;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 2; gbc.fill = GridBagConstraints.HORIZONTAL;
         panel.add(statusLabel, gbc);
 
-        // Add the panel to the window
         add(panel);
 
-        // --- Add the Button's Action ---
-        loginButton.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                // When the button is clicked, call our login method
-                performLogin();
-            }
-        });
+        loginButton.addActionListener(e -> performLogin());
     }
 
-    /**
-     * The main login logic method.
-     */
     private void performLogin() {
         String username = usernameField.getText();
-        // getPassword() returns a char array for security
         String password = new String(passwordField.getPassword());
 
         if (username.isEmpty() || password.isEmpty()) {
@@ -107,26 +75,53 @@ public class LoginWindow extends JFrame {
         }
 
         try {
-            // 1. Call the "brain" (AuthDAO)
             User user = authDAO.login(username, password);
-
-            // 2. Login was successful! Create the session.
             UserSession.getInstance().createUserSession(user);
-
-            // 3. Open the correct dashboard based on role [cite: 5]
             openRoleBasedDashboard(user.getRole());
-
-            // 4. Close this login window
             this.dispose();
 
-        } catch (AuthException | SQLException ex) {
-            // Login failed (wrong password or DB error)
-            statusLabel.setText(ex.getMessage());
+        } catch (AuthException ex) {
+            // CHECK FOR LOCKOUT TIMER
+            if (ex.getWaitSeconds() > 0) {
+                startCountdown(ex.getWaitSeconds());
+            } else {
+                statusLabel.setText(ex.getMessage());
+            }
+        } catch (SQLException ex) {
+            statusLabel.setText("Database Error: " + ex.getMessage());
         }
     }
 
+    private void startCountdown(long seconds) {
+        loginButton.setEnabled(false); // Disable button
+        usernameField.setEnabled(false);
+        passwordField.setEnabled(false);
+
+        // Create a Timer that ticks every 1 second (1000ms)
+        lockoutTimer = new Timer(1000, new ActionListener() {
+            long timeLeft = seconds;
+
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                if (timeLeft > 0) {
+                    statusLabel.setText("Locked! Try again in " + timeLeft + " seconds.");
+                    timeLeft--;
+                } else {
+                    ((Timer)e.getSource()).stop(); // Stop timer
+                    loginButton.setEnabled(true); // Re-enable inputs
+                    usernameField.setEnabled(true);
+                    passwordField.setEnabled(true);
+                    statusLabel.setText("Login unlocked. Please try again.");
+                    statusLabel.setForeground(new Color(0, 128, 0)); // Green
+                }
+            }
+        });
+
+        lockoutTimer.setInitialDelay(0); // Start immediately
+        lockoutTimer.start();
+    }
+
     private void openRoleBasedDashboard(String role) {
-        // This is the "role-aware" part of Week 3
         if (role.equals("Student")) {
             new StudentDashboard().setVisible(true);
         } else if (role.equals("Instructor")) {

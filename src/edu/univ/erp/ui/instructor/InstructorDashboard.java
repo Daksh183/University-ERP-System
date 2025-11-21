@@ -2,6 +2,7 @@ package edu.univ.erp.ui.instructor;
 
 import edu.univ.erp.auth.UserSession;
 import edu.univ.erp.ui.auth.LoginWindow;
+import edu.univ.erp.ui.auth.ChangePasswordDialog;
 
 import javax.swing.*;
 import java.awt.*;
@@ -16,20 +17,20 @@ public class InstructorDashboard extends JFrame {
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLocationRelativeTo(null);
 
-        // --- Create Menu Bar ---
         JMenuBar menuBar = new JMenuBar();
 
-        // 1. File Menu
         JMenu fileMenu = new JMenu("File");
+        JMenuItem changePassItem = new JMenuItem("Change Password");
         JMenuItem logoutItem = new JMenuItem("Logout");
+        fileMenu.add(changePassItem);
+        fileMenu.addSeparator();
         fileMenu.add(logoutItem);
         menuBar.add(fileMenu);
 
-        // 2. Sections Menu (Navigation)
         JMenu sectionsMenu = new JMenu("Sections");
         JMenuItem itemMySections = new JMenuItem("View My Sections");
         JMenuItem itemGradebook = new JMenuItem("View Gradebook");
-        JMenuItem itemClassStats = new JMenuItem("View Class Stats"); // <--- Added this
+        JMenuItem itemClassStats = new JMenuItem("View Class Stats");
 
         sectionsMenu.add(itemMySections);
         sectionsMenu.add(itemGradebook);
@@ -38,26 +39,23 @@ public class InstructorDashboard extends JFrame {
 
         setJMenuBar(menuBar);
 
-        // --- Create the Tabbed Pane ---
         tabbedPane = new JTabbedPane();
-
-        // Add all tabs in order
-        tabbedPane.addTab("My Sections", new MySectionsPanel());    // Index 0
-        tabbedPane.addTab("Gradebook", new GradebookPanel());       // Index 1
-        tabbedPane.addTab("Class Stats", new ClassStatsPanel());    // Index 2
+        tabbedPane.addTab("My Sections", new MySectionsPanel());
+        tabbedPane.addTab("Gradebook", new GradebookPanel());
+        tabbedPane.addTab("Class Stats", new ClassStatsPanel());
 
         add(tabbedPane);
 
-        // --- 3. Menu Navigation Logic (The "Mapping") ---
         itemMySections.addActionListener(e -> tabbedPane.setSelectedIndex(0));
         itemGradebook.addActionListener(e -> tabbedPane.setSelectedIndex(1));
         itemClassStats.addActionListener(e -> tabbedPane.setSelectedIndex(2));
 
-        // --- 4. Logout Logic ---
+        changePassItem.addActionListener(e -> new ChangePasswordDialog(this).setVisible(true));
+
         logoutItem.addActionListener(e -> {
-            UserSession.getInstance().clearSession(); // Clear session
-            this.dispose(); // Close this window
-            new LoginWindow().setVisible(true); // Open login window
+            UserSession.getInstance().clearSession();
+            this.dispose();
+            new LoginWindow().setVisible(true);
         });
     }
 }

@@ -1,13 +1,13 @@
 package edu.univ.erp.data;
-
+import edu.univ.erp.domain.Instructor;
 import java.sql.SQLException;
+import java.util.List;
 
 public interface InstructorDAO {
-    /**
-     * Creates a new instructor profile in the ERP DB.
-     * @param userId The user_id from the Auth DB
-     * @param department The instructor's department
-     * @throws SQLException
-     */
     void createInstructorProfile(int userId, String department) throws SQLException;
+
+    // --- THIS WAS MISSING ---
+    void updateInstructorProfile(int userId, String department) throws SQLException;
+
+    List<Instructor> getAllInstructors() throws SQLException;
 }
