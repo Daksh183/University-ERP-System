@@ -62,17 +62,15 @@ public class CourseCatalogPanel extends JPanel {
         catalogTable.setShowGrid(true);
         catalogTable.setGridColor(new Color(100, 100, 100));
         catalogTable.setIntercellSpacing(new Dimension(1, 1));
-        catalogTable.setRowHeight(30); // Standard height
+        catalogTable.setRowHeight(30);
 
-        // Center Headers
         ((DefaultTableCellRenderer)catalogTable.getTableHeader().getDefaultRenderer()).setHorizontalAlignment(JLabel.CENTER);
 
-        // Left Data + Padding
         DefaultTableCellRenderer leftRenderer = new DefaultTableCellRenderer();
         leftRenderer.setHorizontalAlignment(JLabel.LEFT);
         leftRenderer.setBorder(BorderFactory.createEmptyBorder(0, 5, 0, 0));
         catalogTable.setDefaultRenderer(Object.class, leftRenderer);
-        catalogTable.setDefaultRenderer(Integer.class, leftRenderer); // Also apply to Integer columns
+        catalogTable.setDefaultRenderer(Integer.class, leftRenderer);
         catalogTable.setDefaultRenderer(String.class, leftRenderer);
         // ---------------
 
@@ -89,7 +87,11 @@ public class CourseCatalogPanel extends JPanel {
         checkDeadlineAndLoadData();
     }
 
-    private void checkDeadlineAndLoadData() {
+    /**
+     * Public method to check registration status and load data.
+     * Changed from private to public for StudentDashboard access.
+     */
+    public void checkDeadlineAndLoadData() {
         try {
             LocalDate dbDate = settingsDAO.getDatabaseCurrentDate();
             LocalDate deadline = settingsDAO.getRegistrationDeadline();
@@ -148,6 +150,11 @@ public class CourseCatalogPanel extends JPanel {
             int studentId = UserSession.getInstance().getCurrentUser().getUserId();
             studentService.registerForSection(studentId, selectedSection.getSectionId());
             JOptionPane.showMessageDialog(this, "Successfully registered for " + selectedSection.getCourseCode(), "Success", JOptionPane.INFORMATION_MESSAGE);
+            // After successful registration, reload the catalog (capacity might change) and update My Registrations
+            checkDeadlineAndLoadData();
+
+            // Note: StudentDashboard listener should handle refreshing other tabs (MyRegistrations)
+
         } catch (ServiceException | SQLException ex) {
             JOptionPane.showMessageDialog(this, "Registration failed: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }

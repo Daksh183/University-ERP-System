@@ -17,12 +17,16 @@ public class StudentService {
     private GradeDAO gradeDAO;
     private AccessControlService accessControl;
     private SettingsDAO settingsDAO;
+    private CourseDAO courseDAO;
+    private StudentDAO studentDAO;
 
     public StudentService() {
         this.enrollmentDAO = new EnrollmentDAOImpl();
         this.gradeDAO = new GradeDAOImpl();
         this.accessControl = new AccessControlService();
         this.settingsDAO = new SettingsDAOImpl();
+        this.courseDAO = new CourseDAOImpl();
+        this.studentDAO = new StudentDAOImpl();
     }
 
     /**
@@ -34,8 +38,7 @@ public class StudentService {
             throw new ServiceException("Maintenance Mode is ON. Registration is temporarily disabled.");
         }
 
-        // 2. --- NEW CHECK: REGISTRATION DEADLINE ---
-        // We check the REGISTRATION deadline here (not the drop deadline)
+        // 2. Check Registration Deadline
         LocalDate deadline = settingsDAO.getRegistrationDeadline();
         LocalDate today = settingsDAO.getDatabaseCurrentDate();
 
@@ -43,14 +46,46 @@ public class StudentService {
             throw new ServiceException("Registration closed on " + deadline + ". You cannot register anymore.");
         }
 
-        // 3. Attempt Registration
+        // --- Get Section Details ---
+        List<Section> allSections = courseDAO.getAllSections();
+        Section targetSection = null;
+        for (Section sec : allSections) {
+            if (sec.getSectionId() == sectionId) {
+                targetSection = sec;
+                break;
+            }
+        }
+
+        if (targetSection == null) {
+            throw new ServiceException("Section not found.");
+        }
+
+        // 3. Check Capacity
+        int capacity = targetSection.getCapacity();
+        if (capacity <= 0) {
+            throw new ServiceException("Section capacity is invalid.");
+        }
+
+        int currentEnrollment = enrollmentDAO.getEnrollmentCount(sectionId);
+
+        if (currentEnrollment >= capacity) {
+            throw new ServiceException("Section full. Cannot register.");
+        }
+
+        // 5. NEW CHECK: DUPLICATE COURSE ENROLLMENT (Cannot take two sections of same course)
+        if (enrollmentDAO.isStudentEnrolledInCourse(studentId, targetSection.getCourseId())) {
+            throw new ServiceException("You are already enrolled in a section of this course (" + targetSection.getCourseCode() + ").");
+        }
+        // --- END NEW CHECK ---
+
+        // 6. Attempt Registration
         try {
             enrollmentDAO.addEnrollment(studentId, sectionId);
         } catch (SQLException e) {
             if (e.getErrorCode() == 1062) {
-                throw new ServiceException("You are already registered for this section.");
+                throw new ServiceException("You are already registered for this specific section.");
             }
-            throw new ServiceException("Database error. Could not register.");
+            throw new ServiceException("Database error. Could not register. Error Code: " + e.getErrorCode());
         }
     }
 
@@ -63,8 +98,7 @@ public class StudentService {
             throw new ServiceException("Maintenance Mode is ON. Dropping courses is temporarily disabled.");
         }
 
-        // 2. --- CHECK: DROP DEADLINE ---
-        // We check the DROP deadline here
+        // 2. CHECK: DROP DEADLINE
         LocalDate deadline = settingsDAO.getDropDeadline();
         LocalDate today = settingsDAO.getDatabaseCurrentDate();
 

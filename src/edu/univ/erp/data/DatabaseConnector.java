@@ -10,13 +10,19 @@ public class DatabaseConnector {
     // Make sure to change "YOUR_ROOT_PASSWORD" to the password you set
     private static final String AUTH_DB_URL = "jdbc:mysql://localhost:3306/university_auth_db";
     private static final String AUTH_DB_USER = "root";
-    private static final String AUTH_DB_PASSWORD = "IlSsV@0607mysql"; // <-- CHANGE THIS
+    private static final String AUTH_DB_PASSWORD = "Admin@12"; // <-- CHANGE THIS
 
     // --- ERP DB Connection ---
     // Make sure to change "YOUR_ROOT_PASSWORD"
     private static final String ERP_DB_URL = "jdbc:mysql://localhost:3306/university_erp_db";
     private static final String ERP_DB_USER = "root";
-    private static final String ERP_DB_PASSWORD = "IlSsV@0607mysql"; // <-- CHANGE THIS
+    private static final String ERP_DB_PASSWORD = "Admin@12"; // <-- CHANGE THIS
+
+    // --- NEW GETTERS FOR SHELL COMMANDS ---
+    public static String getErpDbName() { return "university_erp_db"; }
+    public static String getErpDbUser() { return ERP_DB_USER; }
+    public static String getErpDbPassword() { return ERP_DB_PASSWORD; }
+    // --- END NEW GETTERS ---
 
     /**
      * Gets a connection to the Auth DB (for logins).

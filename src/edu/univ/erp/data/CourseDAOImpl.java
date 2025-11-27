@@ -1,5 +1,6 @@
 package edu.univ.erp.data;
 
+import edu.univ.erp.domain.Course;
 import edu.univ.erp.domain.Section;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -62,6 +63,38 @@ public class CourseDAOImpl implements CourseDAO {
     }
 
     @Override
+    public List<Course> getAllCourses() throws SQLException {
+        List<Course> courses = new ArrayList<>();
+        String sql = "SELECT course_id, code, title, credits FROM courses ORDER BY code ASC";
+        try (Connection conn = DatabaseConnector.getErpConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql);
+             ResultSet rs = stmt.executeQuery()) {
+            while (rs.next()) {
+                courses.add(new Course(
+                        rs.getInt("course_id"),
+                        rs.getString("code"),
+                        rs.getString("title"),
+                        rs.getInt("credits")
+                ));
+            }
+        }
+        return courses;
+    }
+
+    @Override
+    public int getCourseIdByCode(String code) throws SQLException {
+        String sql = "SELECT course_id FROM courses WHERE code = ?";
+        try (Connection conn = DatabaseConnector.getErpConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, code);
+            try (ResultSet rs = stmt.executeQuery()) {
+                if (rs.next()) return rs.getInt("course_id");
+            }
+        }
+        return -1;
+    }
+
+    @Override
     public void createCourse(String code, String title, int credits) throws SQLException {
         String sql = "INSERT INTO courses (code, title, credits) VALUES (?, ?, ?)";
         try (Connection conn = DatabaseConnector.getErpConnection();
@@ -101,7 +134,6 @@ public class CourseDAOImpl implements CourseDAO {
         }
     }
 
-    // --- UPDATED METHOD: Allows editing everything ---
     @Override
     public void updateSection(int sectionId, int courseId, int instructorId, String dayTime, String room, int capacity, String semester, int year) throws SQLException {
         String sql = "UPDATE sections SET course_id=?, instructor_id=?, day_time=?, room=?, capacity=?, semester=?, year=? WHERE section_id=?";
@@ -115,6 +147,26 @@ public class CourseDAOImpl implements CourseDAO {
             stmt.setString(6, semester);
             stmt.setInt(7, year);
             stmt.setInt(8, sectionId);
+            stmt.executeUpdate();
+        }
+    }
+
+    @Override
+    public void deleteSection(int sectionId) throws SQLException {
+        String sql = "DELETE FROM sections WHERE section_id = ?";
+        try (Connection conn = DatabaseConnector.getErpConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setInt(1, sectionId);
+            stmt.executeUpdate();
+        }
+    }
+
+    @Override
+    public void deleteCourse(String courseCode) throws SQLException {
+        String sql = "DELETE FROM courses WHERE code = ?";
+        try (Connection conn = DatabaseConnector.getErpConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+            stmt.setString(1, courseCode);
             stmt.executeUpdate();
         }
     }

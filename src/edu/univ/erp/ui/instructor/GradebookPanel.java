@@ -8,15 +8,16 @@ import edu.univ.erp.domain.Student;
 import edu.univ.erp.service.InstructorService;
 import edu.univ.erp.service.StudentService;
 import edu.univ.erp.service.ServiceException;
+import edu.univ.erp.util.CsvExporter; // <--- NEW IMPORT
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.io.File;
 import java.sql.SQLException;
-import java.util.HashMap;
+import java.util.*;
 import java.util.List;
-import java.util.Map;
 
 public class GradebookPanel extends JPanel {
 
@@ -40,6 +41,7 @@ public class GradebookPanel extends JPanel {
     private JTextField weightageField;
     private JButton saveGradeButton;
     private JButton publishButton;
+    private JButton exportButton; // <--- NEW BUTTON
     private JPanel gradeEntryPanel;
 
     public GradebookPanel() {
@@ -57,7 +59,7 @@ public class GradebookPanel extends JPanel {
 
         // --- Center: Split Pane ---
 
-        // 1. LEFT SIDE (Students List + Publish Button)
+        // 1. LEFT SIDE (Students List + Publish/Export Buttons)
         JPanel leftPanel = new JPanel(new BorderLayout(5, 5));
 
         String[] studentCols = {"Roll No", "Name"};
@@ -68,21 +70,26 @@ public class GradebookPanel extends JPanel {
         styleTable(studentTable);
         studentTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
-        // Scroll pane handles the scrolling automatically
         JScrollPane studentScroll = new JScrollPane(studentTable);
         leftPanel.add(studentScroll, BorderLayout.CENTER);
 
-        // Publish Button (Moved to bottom of left panel)
+        // Publish Button
         publishButton = new JButton("Publish Grades for Class");
-        publishButton.setBackground(new Color(40, 167, 69)); // Dark Green
+        publishButton.setBackground(new Color(40, 167, 69));
         publishButton.setForeground(Color.WHITE);
         publishButton.setFocusPainted(false);
 
-        // Wrapper for button padding
+        // Export Button
+        exportButton = new JButton("Export Roster (CSV)");
+        exportButton.setBackground(new Color(50, 50, 130));
+        exportButton.setForeground(Color.WHITE);
+        exportButton.setFocusPainted(false);
+
+        // Wrapper for buttons padding
         JPanel btnWrapper = new JPanel(new FlowLayout(FlowLayout.CENTER));
         btnWrapper.add(publishButton);
+        btnWrapper.add(exportButton);
         leftPanel.add(btnWrapper, BorderLayout.SOUTH);
-
 
         // 2. RIGHT SIDE (Individual Student Grades)
         JPanel rightPanel = new JPanel(new BorderLayout(5, 5));
@@ -96,7 +103,7 @@ public class GradebookPanel extends JPanel {
         JScrollPane gradeScroll = new JScrollPane(gradeTable);
 
         // --- Grade Entry Form ---
-        gradeEntryPanel = new JPanel(new GridLayout(5, 2, 5, 5)); // Reduced rows (removed publish)
+        gradeEntryPanel = new JPanel(new GridLayout(5, 2, 5, 5));
         gradeEntryPanel.setBorder(BorderFactory.createTitledBorder("Manage Grades"));
 
         gradeEntryPanel.add(new JLabel("Component Name:"));
@@ -138,6 +145,7 @@ public class GradebookPanel extends JPanel {
         studentTable.getSelectionModel().addListSelectionListener(e -> loadGradesForSelectedStudent());
         saveGradeButton.addActionListener(e -> performSaveGrade());
         publishButton.addActionListener(e -> performPublishGrade());
+        exportButton.addActionListener(e -> performExportGrades()); // <--- NEW LISTENER
     }
 
     private void styleTable(JTable table) {
@@ -242,8 +250,7 @@ public class GradebookPanel extends JPanel {
     }
 
     private void performPublishGrade() {
-        // We don't need a row selected to publish for the whole class
-        // But we do need a section selected
+        // ... (Existing logic for publishing grades)
         if (sectionSelector.getSelectedIndex() == -1) return;
 
         // Ask Instructor for Grading Scale
@@ -290,6 +297,71 @@ public class GradebookPanel extends JPanel {
             } catch (SQLException | ServiceException e) {
                 showError("Error publishing: " + e.getMessage());
             }
+        }
+    }
+
+    private void performExportGrades() {
+        int idx = sectionSelector.getSelectedIndex();
+        if (idx == -1) { showError("Select a section first."); return; }
+
+        Section sec = mySections.get(idx);
+        String courseCode = sec.getCourseCode();
+        String instructorName = sec.getInstructorName();
+
+        try {
+            // 1. Get the comprehensive roster data from the service
+            List<Map<String, Object>> exportData = instructorService.getFullGradeRosterForExport(sec.getSectionId());
+
+            if (exportData.isEmpty()) {
+                showError("No enrollment data found for this section.");
+                return;
+            }
+
+            // 2. Dynamically determine the full set of columns for the header
+            Set<String> dynamicHeaders = new TreeSet<>();
+            for (Map<String, Object> row : exportData) {
+                dynamicHeaders.addAll(row.keySet());
+            }
+
+            // 3. Define the mandatory header order (Student Info)
+            List<String> finalHeaderList = new ArrayList<>();
+            finalHeaderList.add("Roll No");
+            finalHeaderList.add("Student Name");
+
+            // 4. Add dynamic grade component headers in a consistent order (A-Z)
+            Set<String> sortedGradeKeys = new TreeSet<>(dynamicHeaders);
+            for (String key : sortedGradeKeys) {
+                if (!key.equals("Roll No") && !key.equals("Student Name")
+                        && !key.equals("Weighted Total") && !key.equals("Max Weight Possible")
+                        && !key.equals("Final Grade")) {
+                    finalHeaderList.add(key);
+                }
+            }
+
+            // 5. Add final summary columns
+            finalHeaderList.add("Weighted Total");
+            finalHeaderList.add("Max Weight Possible");
+            finalHeaderList.add("Final Grade");
+
+
+            // 6. File Chooser Dialog
+            JFileChooser fileChooser = new JFileChooser();
+            fileChooser.setDialogTitle("Save Grade Roster");
+            fileChooser.setSelectedFile(new File(courseCode + "_GradeRoster.csv"));
+
+            if (fileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
+                File file = fileChooser.getSelectedFile();
+
+                // 7. Export to CSV using the CsvExporter utility
+                CsvExporter.exportData(file.getAbsolutePath(), exportData, finalHeaderList.toArray(new String[0]));
+
+                JOptionPane.showMessageDialog(this, "Grade Roster saved successfully to " + file.getName(), "Success", JOptionPane.INFORMATION_MESSAGE);
+            }
+
+        } catch (ServiceException | SQLException e) {
+            showError("Error exporting roster: " + e.getMessage());
+        } catch (Exception ex) {
+            showError("An unexpected error occurred during export: " + ex.getMessage());
         }
     }
 

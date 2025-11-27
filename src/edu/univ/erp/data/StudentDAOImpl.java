@@ -22,7 +22,6 @@ public class StudentDAOImpl implements StudentDAO {
         }
     }
 
-    // --- THIS WAS MISSING ---
     @Override
     public void updateStudentProfile(int userId, String rollNo, String program) throws SQLException {
         String sql = "UPDATE students SET roll_no = ?, program = ? WHERE user_id = ?";
@@ -60,3 +59,4 @@ public class StudentDAOImpl implements StudentDAO {
         return students;
     }
 }
+

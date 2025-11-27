@@ -8,8 +8,8 @@ public interface StudentDAO {
 
     void createStudentProfile(int userId, String rollNo, String program) throws SQLException;
 
-    // --- THIS WAS MISSING ---
     void updateStudentProfile(int userId, String rollNo, String program) throws SQLException;
 
     List<Student> getAllStudents() throws SQLException;
+
 }

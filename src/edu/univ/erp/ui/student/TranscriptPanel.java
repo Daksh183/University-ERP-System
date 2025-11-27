@@ -5,22 +5,27 @@ import edu.univ.erp.domain.Enrollment;
 import edu.univ.erp.domain.Grade;
 import edu.univ.erp.domain.Section;
 import edu.univ.erp.service.StudentService;
+import edu.univ.erp.util.CsvExporter; // <--- NEW IMPORT
+import edu.univ.erp.util.PdfExporter; // <--- NEW IMPORT
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.sql.SQLException;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.ArrayList;
 
 public class TranscriptPanel extends JPanel {
 
     private JTable transcriptTable;
     private DefaultTableModel tableModel;
     private JButton downloadButton;
+    private JButton downloadPdfButton; // <--- NEW BUTTON
     private StudentService studentService;
 
     public TranscriptPanel() {
@@ -43,39 +48,39 @@ public class TranscriptPanel extends JPanel {
         transcriptTable = new JTable(tableModel);
         transcriptTable.setFillsViewportHeight(true);
 
-        // --- STYLING START ---
+        // --- STYLING ---
         transcriptTable.setShowGrid(true);
-        transcriptTable.setGridColor(new Color(100, 100, 100)); // Gray Grid
+        transcriptTable.setGridColor(new Color(100, 100, 100));
         transcriptTable.setIntercellSpacing(new Dimension(1, 1));
-        transcriptTable.setRowHeight(35); // Comfortable height
+        transcriptTable.setRowHeight(35);
 
-        // Header: Center Aligned
         ((DefaultTableCellRenderer)transcriptTable.getTableHeader().getDefaultRenderer()).setHorizontalAlignment(JLabel.CENTER);
 
-        // Data: Left Aligned + Padding
         DefaultTableCellRenderer leftRenderer = new DefaultTableCellRenderer();
         leftRenderer.setHorizontalAlignment(JLabel.LEFT);
-        leftRenderer.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0)); // 10px padding left
+        leftRenderer.setBorder(BorderFactory.createEmptyBorder(0, 10, 0, 0));
         transcriptTable.setDefaultRenderer(Object.class, leftRenderer);
         // --- STYLING END ---
 
         JScrollPane scrollPane = new JScrollPane(transcriptTable);
         add(scrollPane, BorderLayout.CENTER);
 
-        // --- 3. Download Button ---
+        // --- 3. Download Buttons ---
         downloadButton = new JButton("Download Transcript (CSV)");
+        downloadPdfButton = new JButton("Download Transcript (PDF)");
+
         JPanel bottomPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
         bottomPanel.add(downloadButton);
+        bottomPanel.add(downloadPdfButton);
         add(bottomPanel, BorderLayout.SOUTH);
 
         // --- Actions ---
-        downloadButton.addActionListener(e -> generateTranscriptCSV());
+        downloadButton.addActionListener(e -> generateTranscriptFile(true)); // CSV
+        downloadPdfButton.addActionListener(e -> generateTranscriptFile(false)); // PDF
 
-        // Load data immediately
         refreshData();
     }
 
-    // --- REQUIRED METHOD FOR DASHBOARD REFRESH ---
     public void refreshData() {
         loadTranscriptData();
     }
@@ -85,12 +90,10 @@ public class TranscriptPanel extends JPanel {
             tableModel.setRowCount(0);
             int studentId = UserSession.getInstance().getCurrentUser().getUserId();
 
-            // Fetch all necessary data
             List<Enrollment> enrollments = studentService.getMyEnrollments(studentId);
-            List<Section> sections = studentService.getMyTimetable(studentId); // Reusing this to get Section details
+            List<Section> sections = studentService.getMyTimetable(studentId);
 
             for (Enrollment enrollment : enrollments) {
-                // Find section details
                 Section matchingSection = null;
                 for (Section sec : sections) {
                     if (sec.getSectionId() == enrollment.getSectionId()) {
@@ -100,11 +103,9 @@ public class TranscriptPanel extends JPanel {
                 }
 
                 if (matchingSection != null) {
-                    // Find Final Grade
-                    String finalGrade = "Pending"; // Default
+                    String finalGrade = "Pending";
                     List<Grade> grades = studentService.getGrades(enrollment.getEnrollmentId());
 
-                    // Check if any grade entry has a final grade string
                     for (Grade g : grades) {
                         if (g.getFinalGrade() != null && !g.getFinalGrade().isEmpty()) {
                             finalGrade = g.getFinalGrade();
@@ -112,7 +113,6 @@ public class TranscriptPanel extends JPanel {
                         }
                     }
 
-                    // Add row to table
                     Object[] row = {
                             matchingSection.getCourseCode(),
                             matchingSection.getCourseTitle(),
@@ -131,29 +131,40 @@ public class TranscriptPanel extends JPanel {
         }
     }
 
-    private void generateTranscriptCSV() {
+    private void generateTranscriptFile(boolean isCSV) {
+        String format = isCSV ? "CSV" : "PDF";
         JFileChooser fileChooser = new JFileChooser();
-        fileChooser.setDialogTitle("Save Transcript");
-        fileChooser.setSelectedFile(new File("transcript.csv"));
+        fileChooser.setDialogTitle("Save Transcript as " + format);
+        String studentName = UserSession.getInstance().getCurrentUser().getUsername();
+
+        File defaultFile = new File(studentName + "_transcript" + (isCSV ? ".csv" : ".pdf"));
+        fileChooser.setSelectedFile(defaultFile);
 
         if (fileChooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
             File file = fileChooser.getSelectedFile();
-            try (FileWriter writer = new FileWriter(file)) {
-                // Write Header
-                for (int i = 0; i < tableModel.getColumnCount(); i++) {
-                    writer.write(tableModel.getColumnName(i) + (i == tableModel.getColumnCount() - 1 ? "" : ","));
-                }
-                writer.write("\n");
 
-                // Write Rows from the Table Model
-                for (int i = 0; i < tableModel.getRowCount(); i++) {
-                    for (int j = 0; j < tableModel.getColumnCount(); j++) {
-                        writer.write(tableModel.getValueAt(i, j) + (j == tableModel.getColumnCount() - 1 ? "" : ","));
+            try {
+                if (isCSV) {
+                    // Prepare data for CsvExporter
+                    List<Map<String, Object>> csvData = new ArrayList<>();
+                    String[] columnNames = {"Course Code", "Course Title", "Credits", "Semester", "Year", "Final Grade"};
+
+                    for (int i = 0; i < tableModel.getRowCount(); i++) {
+                        Map<String, Object> row = new HashMap<>();
+                        for (int j = 0; j < tableModel.getColumnCount(); j++) {
+                            row.put(columnNames[j], tableModel.getValueAt(i, j));
+                        }
+                        csvData.add(row);
                     }
-                    writer.write("\n");
+
+                    CsvExporter.exportData(file.getAbsolutePath(), csvData, columnNames);
+
+                } else {
+                    // PDF (Mock TXT) Export using PdfExporter
+                    PdfExporter.exportTranscriptPdf(file.getAbsolutePath(), tableModel, studentName);
                 }
 
-                JOptionPane.showMessageDialog(this, "Transcript saved successfully!", "Success", JOptionPane.INFORMATION_MESSAGE);
+                JOptionPane.showMessageDialog(this, "Transcript saved successfully as " + format + "!", "Success", JOptionPane.INFORMATION_MESSAGE);
             } catch (IOException ex) {
                 JOptionPane.showMessageDialog(this, "Error saving file: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
             }
